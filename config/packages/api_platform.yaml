@@ -1,0 +1,28 @@
+api_platform:
+    title: 'Hello API Platform'
+    version: 1.0.0
+    formats:
+        jsonhal:
+            - application/hal+json
+    enable_swagger_ui: true
+    enable_re_doc: false
+    enable_scalar: false
+    defaults:
+        stateless: true
+        cache_headers:
+            vary: [Content-Type, Authorization, Origin]
+
+    oauth:
+        enabled: true
+        type: oauth2
+        flow: authorizationCode
+
+        clientId: '%env(OAUTH2_CLIENT_ID)%'
+
+        authorizationUrl: 'https://auth.meunier.ovh/oauth/authorize'
+        tokenUrl: 'http://192.168.50.12:8000/oauth/token'
+
+        scopes:
+            products:read: 'Lire les produits'
+            products:write: 'Modifier les produits'
+            profile: 'Accéder au profil'
