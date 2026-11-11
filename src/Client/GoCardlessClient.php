@@ -18,9 +18,6 @@ readonly class GoCardlessClient
         #[Autowire(env: "GOCARDLESS_CLIENT_SECRET")] private string $secretKey,
     ) {}
 
-    /**
-     * Authentification GoCardless
-     */
     public function getAccessToken(): string
     {
         return $this->cache->get('GoCardlessClient_access_token', function () {
@@ -41,9 +38,6 @@ readonly class GoCardlessClient
         });
     }
 
-    /**
-     * Requête HTTP générique authentifiée
-     */
     private function request(
         string $method,
         string $endpoint,
@@ -79,12 +73,7 @@ readonly class GoCardlessClient
         }
     }
 
-    /**
-     * Liste des institutions
-     */
-    public function getInstitutions(
-        array $filters = []
-    ): array {
+    public function getInstitutions(array $filters = []): array {
         return $this->request(
             'GET',
             '/api/v2/institutions/',
@@ -92,9 +81,6 @@ readonly class GoCardlessClient
         );
     }
 
-    /**
-     * Création d'une requisition
-     */
     public function createRequisition(array $data): array
     {
         return $this->request(
@@ -104,10 +90,7 @@ readonly class GoCardlessClient
         );
     }
 
-    /**
-     * Récupération d'une requisition
-     */
-    public function getRequisition(string $id): array
+    public function getRequisition(Uuid $id): array
     {
         return $this->request(
             'GET',
@@ -115,9 +98,6 @@ readonly class GoCardlessClient
         );
     }
 
-    /**
-     * Suppression d'une requisition
-     */
     public function deleteRequisition(Uuid $id): array
     {
         return $this->request(
@@ -126,9 +106,6 @@ readonly class GoCardlessClient
         );
     }
 
-    /**
-     * Métadonnées du compte
-     */
     public function getAccount(string $id): array
     {
         return $this->request(
@@ -137,9 +114,6 @@ readonly class GoCardlessClient
         );
     }
 
-    /**
-     * Soldes du compte
-     */
     public function getAccountBalances(string $id): array
     {
         return $this->request(
@@ -148,9 +122,6 @@ readonly class GoCardlessClient
         );
     }
 
-    /**
-     * Détails du compte
-     */
     public function getAccountDetails(string $id): array
     {
         return $this->request(
@@ -159,9 +130,6 @@ readonly class GoCardlessClient
         );
     }
 
-    /**
-     * Transactions du compte
-     */
     public function getAccountTransactions(
         string $id,
         ?string $dateFrom = null,

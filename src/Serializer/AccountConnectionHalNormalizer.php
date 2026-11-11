@@ -6,6 +6,7 @@ use Symfony\Component\DependencyInjection\Attribute\AutoconfigureTag;
 use Symfony\Component\Serializer\Normalizer\NormalizerAwareInterface;
 use Symfony\Component\Serializer\Normalizer\NormalizerAwareTrait;
 use Symfony\Component\Serializer\Normalizer\NormalizerInterface;
+use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 
 #[AutoconfigureTag('serializer.normalizer', ['priority' => 64])]
 class AccountConnectionHalNormalizer implements NormalizerInterface, NormalizerAwareInterface
@@ -13,6 +14,11 @@ class AccountConnectionHalNormalizer implements NormalizerInterface, NormalizerA
     use NormalizerAwareTrait;
 
     private const ALREADY_CALLED = 'ACCOUNT_CONNECTION_NORMALIZER_ALREADY_CALLED';
+
+    public function __construct(private UrlGeneratorInterface $router)
+    {
+
+    }
 
     public function normalize($data, $format = null, array $context = []): float|int|bool|\ArrayObject|array|string|null
     {
@@ -26,6 +32,15 @@ class AccountConnectionHalNormalizer implements NormalizerInterface, NormalizerA
         if($data->getExternalStatus()->needUserAction()) {
             $normalized['_links']['configure'] = [
                 'href' => $data->getExternalLink()
+            ];
+        }
+
+        if($data->getBankId()) {
+            $normalized['_links']['bank'] = [
+                'href' => $this->router->generate(
+                    '_api_/banks/{id}{._format}_get',
+                    ['id' => $data->getBankId()],
+                )
             ];
         }
 

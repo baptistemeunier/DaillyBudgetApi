@@ -56,8 +56,6 @@ class AccountConnection
     #[Assert\NotBlank]
     #[Assert\Length(min: 1, max: 50)]
     #[ORM\Column(length: 50)]
-    #[ApiProperty(example: "REVOLUT_REVOGB21")]
-    #[Groups(['account-connection:read'])]
     private ?string $bankId = null;
 
     #[ORM\Column(length: 255)]
