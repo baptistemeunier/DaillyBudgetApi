@@ -2,7 +2,6 @@
 
 namespace App\Entity;
 
-use ApiPlatform\Metadata\ApiProperty;
 use ApiPlatform\Metadata\ApiResource;
 use ApiPlatform\Metadata\Delete;
 use ApiPlatform\Metadata\Get;
@@ -20,6 +19,7 @@ use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
+use Symfony\Bridge\Doctrine\Validator\Constraints\UniqueEntity;
 use Symfony\Component\Serializer\Attribute\Groups;
 use Symfony\Component\Uid\Uuid;
 use Symfony\Component\Validator\Constraints as Assert;
@@ -43,7 +43,9 @@ use Symfony\Component\Validator\Constraints as Assert;
     processor: AccountConnectionProcessor::class
 )]
 #[ORM\Entity(repositoryClass: AccountConnectionRepository::class)]
+#[ORM\UniqueConstraint(name: 'UNIQ_EXTERNAL_ID', columns: ['external_id'])]
 #[ORM\HasLifecycleCallbacks]
+#[UniqueEntity('externalId')]
 class AccountConnection
 {
 

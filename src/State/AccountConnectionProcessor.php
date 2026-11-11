@@ -13,11 +13,14 @@ use App\Entity\Account;
 use App\Entity\AccountConnection;
 use App\Entity\User;
 use App\Enum\AccountStatus;
+use App\Enum\AccountSyncStatus;
 use App\Enum\RequisitionStatus;
+use App\Message\AccountSyncRequest;
 use App\Repository\AccountRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
+use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Uid\Uuid;
 
 readonly class AccountConnectionProcessor implements ProcessorInterface
@@ -27,6 +30,7 @@ readonly class AccountConnectionProcessor implements ProcessorInterface
         private AccountRepository $accountRepository,
         private EntityManagerInterface $entityManager,
         private Security $security,
+        private MessageBusInterface $bus
     )
     {
 
@@ -103,7 +107,7 @@ readonly class AccountConnectionProcessor implements ProcessorInterface
 
         foreach ($requisition['accounts'] as $accountId) {
             $account = array_find($accounts, function (Account $account) use ($accountId) {
-                return $account->getId() === $accountId;
+                return $account->getExternalId()->equals(Uuid::fromString($accountId));
             });
 
             $externalAccount = $this->goCardlessClient->getAccount($accountId);
@@ -121,8 +125,13 @@ readonly class AccountConnectionProcessor implements ProcessorInterface
             }
 
             $account
-                ->setSynchronizedAt(new \DateTimeImmutable($externalAccount['last_accessed']))
+                ->setExternalUpdatedAt(new \DateTimeImmutable($externalAccount['last_accessed']))
                 ->setExternalStatus(AccountStatus::tryFrom($externalAccount['status']));
+
+            if($this->needAccountSync($account)) {
+                $account->setSynchronizedStatus(AccountSyncStatus::PENDING);
+                $this->bus->dispatch(new AccountSyncRequest($account->getId()));
+            }
         }
 
         $accountConnection
@@ -149,5 +158,10 @@ readonly class AccountConnectionProcessor implements ProcessorInterface
         $this->entityManager->flush();
 
         return null;
+    }
+
+    private function needAccountSync(mixed $account): bool
+    {
+        return true;
     }
 }

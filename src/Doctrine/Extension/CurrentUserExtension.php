@@ -7,6 +7,7 @@ use ApiPlatform\Doctrine\Orm\Extension\QueryCollectionExtensionInterface;
 use ApiPlatform\Doctrine\Orm\Extension\QueryItemExtensionInterface;
 use ApiPlatform\Doctrine\Orm\Util\QueryNameGeneratorInterface;
 use ApiPlatform\Metadata\Operation;
+use App\Entity\Account;
 use App\Entity\AccountConnection;
 use Doctrine\ORM\QueryBuilder;
 use Symfony\Bridge\Doctrine\Types\UuidType;
@@ -47,7 +48,8 @@ final readonly class CurrentUserExtension implements QueryCollectionExtensionInt
     private function isSupportedEntity(string $resourceClass): bool
     {
         return in_array($resourceClass, [
-            AccountConnection::class
+            AccountConnection::class,
+            Account::class
         ]);
     }
 }

@@ -2,9 +2,7 @@
 
 namespace App\Entity;
 
-use ApiPlatform\Doctrine\Orm\Filter\ExactFilter;
 use ApiPlatform\Doctrine\Orm\Filter\UuidFilter;
-use ApiPlatform\Metadata\ApiFilter;
 use ApiPlatform\Metadata\ApiResource;
 use ApiPlatform\Metadata\Get;
 use ApiPlatform\Metadata\GetCollection;
@@ -13,12 +11,15 @@ use App\Entity\Traits\DeletableTrait;
 use App\Entity\Traits\TimestampableTrait;
 use App\Entity\Traits\UuidTrait;
 use App\Enum\AccountStatus;
+use App\Enum\AccountSyncStatus;
 use App\Repository\AccountRepository;
 use Doctrine\ORM\Mapping as ORM;
+use Symfony\Bridge\Doctrine\Validator\Constraints\UniqueEntity;
 use Symfony\Component\Serializer\Attribute\Groups;
 use Symfony\Component\Uid\Uuid;
 
 #[ORM\Entity(repositoryClass: AccountRepository::class)]
+#[ORM\UniqueConstraint(name: 'UNIQ_EXTERNAL_ID', columns: ['external_id'])]
 #[ORM\HasLifecycleCallbacks]
 #[ApiResource(
     operations: [
@@ -36,6 +37,7 @@ use Symfony\Component\Uid\Uuid;
     ],
     normalizationContext: ['groups' => ['account:read', 'timestamp:read']],
 )]
+#[UniqueEntity('externalId')]
 class Account
 {
     use UuidTrait;
@@ -44,7 +46,7 @@ class Account
 
     #[ORM\Column(nullable: true)]
     #[Groups(['account:read'])]
-    private ?\DateTimeImmutable $synchronizedAt = null;
+    private ?\DateTimeImmutable $externalUpdatedAt = null;
 
     #[ORM\Column(length: 255)]
     #[Groups(['account:read'])]
@@ -71,6 +73,14 @@ class Account
     #[ORM\ManyToOne(inversedBy: 'accounts')]
     #[ORM\JoinColumn(nullable: false)]
     private ?User $owner = null;
+
+    #[ORM\Column(enumType: AccountSyncStatus::class)]
+    #[Groups(['account:read'])]
+    private ?AccountSyncStatus $synchronizedStatus = null;
+
+    #[ORM\Column(nullable: true)]
+    #[Groups(['account:read'])]
+    private ?\DateTimeImmutable $synchronizedAt = null;
 
     public function __construct()
     {
@@ -169,6 +179,30 @@ class Account
     public function setOwner(?User $owner): static
     {
         $this->owner = $owner;
+
+        return $this;
+    }
+
+    public function getSynchronizedStatus(): ?AccountSyncStatus
+    {
+        return $this->synchronizedStatus;
+    }
+
+    public function setSynchronizedStatus(AccountSyncStatus $synchronizedStatus): static
+    {
+        $this->synchronizedStatus = $synchronizedStatus;
+
+        return $this;
+    }
+
+    public function getExternalUpdatedAt(): ?\DateTimeImmutable
+    {
+        return $this->externalUpdatedAt;
+    }
+
+    public function setExternalUpdatedAt(?\DateTimeImmutable $externalUpdatedAt): static
+    {
+        $this->externalUpdatedAt = $externalUpdatedAt;
 
         return $this;
     }
