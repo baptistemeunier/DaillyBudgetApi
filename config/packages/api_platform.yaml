@@ -4,6 +4,10 @@ api_platform:
     formats:
         jsonhal:
             - application/hal+json
+        json:
+            - application/json
+        jsonld:
+            - application/ld+json
     enable_swagger_ui: true
     enable_re_doc: false
     enable_scalar: false
@@ -23,6 +27,5 @@ api_platform:
         tokenUrl: 'http://192.168.50.12:8000/oauth/token'
 
         scopes:
-            products:read: 'Lire les produits'
-            products:write: 'Modifier les produits'
-            profile: 'Accéder au profil'
+            account_connection:read: 'Read Account connections'
+            account_connection:write: 'Write Account connections'
