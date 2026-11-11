@@ -12,4 +12,9 @@ trait UuidTrait
     #[ORM\Id]
     #[ORM\Column(type: 'uuid')]
     private ?Uuid $id;
+
+    public function getId(): ?Uuid
+    {
+        return $this->id;
+    }
 }

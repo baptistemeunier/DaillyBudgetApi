@@ -16,6 +16,8 @@ use App\Entity\Traits\UuidTrait;
 use App\Enum\RequisitionStatus;
 use App\Repository\AccountConnectionRepository;
 use App\State\AccountConnectionProcessor;
+use Doctrine\Common\Collections\ArrayCollection;
+use Doctrine\Common\Collections\Collection;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Serializer\Attribute\Groups;
@@ -69,14 +71,16 @@ class AccountConnection
     #[Groups(['account-connection:read'])]
     private ?RequisitionStatus $externalStatus = null;
 
+    /**
+     * @var Collection<int, Account>
+     */
+    #[ORM\OneToMany(targetEntity: Account::class, mappedBy: 'accountConnection')]
+    private Collection $accounts;
+
     public function __construct()
     {
         $this->id = Uuid::v7();
-    }
-
-    public function getId(): ?Uuid
-    {
-        return $this->id;
+        $this->accounts = new ArrayCollection();
     }
 
     public function getExternalId(): ?Uuid
@@ -138,6 +142,36 @@ class AccountConnection
     public function setOwner(?User $owner): static
     {
         $this->owner = $owner;
+
+        return $this;
+    }
+
+    /**
+     * @return Collection<int, Account>
+     */
+    public function getAccounts(): Collection
+    {
+        return $this->accounts;
+    }
+
+    public function addAccount(Account $account): static
+    {
+        if (!$this->accounts->contains($account)) {
+            $this->accounts->add($account);
+            $account->setAccountConnection($this);
+        }
+
+        return $this;
+    }
+
+    public function removeAccount(Account $account): static
+    {
+        if ($this->accounts->removeElement($account)) {
+            // set the owning side to null (unless already changed)
+            if ($account->getAccountConnection() === $this) {
+                $account->setAccountConnection(null);
+            }
+        }
 
         return $this;
     }

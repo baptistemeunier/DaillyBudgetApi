@@ -2,6 +2,7 @@
 namespace App\Serializer;
 
 use App\Entity\AccountConnection;
+use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\DependencyInjection\Attribute\AutoconfigureTag;
 use Symfony\Component\Serializer\Normalizer\NormalizerAwareInterface;
 use Symfony\Component\Serializer\Normalizer\NormalizerAwareTrait;
@@ -13,9 +14,11 @@ class AccountConnectionHalNormalizer implements NormalizerInterface, NormalizerA
 {
     use NormalizerAwareTrait;
 
-    private const ALREADY_CALLED = 'ACCOUNT_CONNECTION_NORMALIZER_ALREADY_CALLED';
+    private const string ALREADY_CALLED = 'ACCOUNT_CONNECTION_NORMALIZER_ALREADY_CALLED';
 
-    public function __construct(private UrlGeneratorInterface $router)
+    public function __construct(
+        private Security $security,
+        private UrlGeneratorInterface $router)
     {
 
     }
@@ -44,6 +47,14 @@ class AccountConnectionHalNormalizer implements NormalizerInterface, NormalizerA
             ];
         }
 
+        if($this->security->isGranted('ACCOUNT_READ')) {
+            $normalized['_links']['accounts'] = [
+                'href' => $this->router->generate(
+                    '_api_/accounts{._format}_get_collection',
+                    ['accountConnection' => $data->getId()],
+                )
+            ];
+        }
         return $normalized;
     }
 

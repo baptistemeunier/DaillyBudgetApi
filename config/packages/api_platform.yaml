@@ -27,5 +27,7 @@ api_platform:
         tokenUrl: 'http://192.168.50.12:8000/oauth/token'
 
         scopes:
-            account_connection:read: 'Read Account connections'
+            #account_connection:read: 'Read Account connections'
             account_connection:write: 'Write Account connections'
+            #account:read: 'Read Account'
+            account:write: 'Write Account'

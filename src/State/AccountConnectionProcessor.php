@@ -9,9 +9,12 @@ use ApiPlatform\Metadata\Post;
 use ApiPlatform\State\ProcessorInterface;
 use App\Client\GoCardlessClient;
 use App\Dto\CreateAccountConnection;
+use App\Entity\Account;
 use App\Entity\AccountConnection;
 use App\Entity\User;
+use App\Enum\AccountStatus;
 use App\Enum\RequisitionStatus;
+use App\Repository\AccountRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
@@ -21,6 +24,7 @@ readonly class AccountConnectionProcessor implements ProcessorInterface
 {
     public function __construct(
         private GoCardlessClient $goCardlessClient,
+        private AccountRepository $accountRepository,
         private EntityManagerInterface $entityManager,
         private Security $security,
     )
@@ -92,6 +96,34 @@ readonly class AccountConnectionProcessor implements ProcessorInterface
     public function syncConnection(AccountConnection $accountConnection): AccountConnection
     {
         $requisition = $this->goCardlessClient->getRequisition($accountConnection->getExternalId());
+
+        $accounts = $this->accountRepository->findBy([
+            'accountConnection' => $accountConnection
+        ]);
+
+        foreach ($requisition['accounts'] as $accountId) {
+            $account = array_find($accounts, function (Account $account) use ($accountId) {
+                return $account->getId() === $accountId;
+            });
+
+            $externalAccount = $this->goCardlessClient->getAccount($accountId);
+
+            if(!$account) {
+                $account = new Account()
+                    ->setName($externalAccount['name'])
+                    ->setIban($externalAccount['iban'])
+                    ->setOwner($accountConnection->getOwner())
+                    ->setExternalId(Uuid::fromString($externalAccount['id']))
+                    ->setBankId($externalAccount['institution_id'])
+                    ->setAccountConnection($accountConnection);
+
+                $this->entityManager->persist($account);
+            }
+
+            $account
+                ->setSynchronizedAt(new \DateTimeImmutable($externalAccount['last_accessed']))
+                ->setExternalStatus(AccountStatus::tryFrom($externalAccount['status']));
+        }
 
         $accountConnection
             ->setExternalStatus(RequisitionStatus::tryFrom($requisition['status']));

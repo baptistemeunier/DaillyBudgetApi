@@ -33,15 +33,17 @@ class User implements UserInterface
     #[ORM\OneToMany(targetEntity: AccountConnection::class, mappedBy: 'owner')]
     private Collection $accountConnections;
 
+    /**
+     * @var Collection<int, Account>
+     */
+    #[ORM\OneToMany(targetEntity: Account::class, mappedBy: 'owner')]
+    private Collection $accounts;
+
     public function __construct()
     {
-        $this->accountConnections = new ArrayCollection();
         $this->id = Uuid::v7();
-    }
-
-    public function getId(): ?Uuid
-    {
-        return $this->id;
+        $this->accountConnections = new ArrayCollection();
+        $this->accounts = new ArrayCollection();
     }
 
     public function getUsername(): ?string
@@ -108,6 +110,36 @@ class User implements UserInterface
             // set the owning side to null (unless already changed)
             if ($accountConnection->getOwner() === $this) {
                 $accountConnection->setOwner(null);
+            }
+        }
+
+        return $this;
+    }
+
+    /**
+     * @return Collection<int, Account>
+     */
+    public function getAccounts(): Collection
+    {
+        return $this->accounts;
+    }
+
+    public function addAccount(Account $account): static
+    {
+        if (!$this->accounts->contains($account)) {
+            $this->accounts->add($account);
+            $account->setOwner($this);
+        }
+
+        return $this;
+    }
+
+    public function removeAccount(Account $account): static
+    {
+        if ($this->accounts->removeElement($account)) {
+            // set the owning side to null (unless already changed)
+            if ($account->getOwner() === $this) {
+                $account->setOwner(null);
             }
         }
 
