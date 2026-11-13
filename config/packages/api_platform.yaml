@@ -31,3 +31,5 @@ api_platform:
             account_connection:write: 'Write Account connections'
             #account:read: 'Read Account'
             account:write: 'Write Account'
+            #category:read: 'Read Category'
+            category:write: 'Write Category'

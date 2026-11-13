@@ -28,6 +28,7 @@ security:
     role_hierarchy:
         'ROLE_account_connection:write': ['ROLE_account_connection:read']
         'ROLE_account:write': ['ROLE_account:read']
+        'ROLE_category:write': ['ROLE_category:read']
 
 when@test:
     security:

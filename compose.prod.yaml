@@ -71,7 +71,8 @@ services:
     image: ${REGISTRY:?}/daily-budget-api:${TAG:-latest}
     pull_policy: always
     environment: *api-env
-    command: ["php", "bin/console", "doctrine:migrations:migrate", "--no-interaction", "--allow-no-migration"]
+    # Schema first, then the system categories catalog (idempotent, runs on every deploy)
+    command: ["sh", "-c", "php bin/console doctrine:migrations:migrate --no-interaction --allow-no-migration && php bin/console app:categories:sync --no-interaction"]
     healthcheck: { disable: true }
     restart: "no"
     depends_on:

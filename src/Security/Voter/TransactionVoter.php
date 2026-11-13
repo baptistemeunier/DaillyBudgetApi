@@ -17,6 +17,7 @@ final class TransactionVoter extends Voter
 {
     public const READ = 'TRANSACTION_READ';
     public const ACCOUNT_READ = 'TRANSACTION_ACCOUNT_READ';
+    public const UPDATE = 'TRANSACTION_UPDATE';
 
     public function __construct(private Security $security, private AccountRepository $accountRepository)
     {
@@ -35,7 +36,7 @@ final class TransactionVoter extends Voter
         }
 
         // Object validation
-        return in_array($attribute, [self::READ])
+        return in_array($attribute, [self::READ, self::UPDATE])
             && $subject instanceof Transaction;
     }
 
@@ -92,15 +93,14 @@ final class TransactionVoter extends Voter
 
     private function voteOnItem(string $attribute, mixed $subject, TokenInterface $token, ?Vote $vote): bool
     {
-        $user = $token->getUser();
-
         if(!$this->security->isGranted(Role::ACCOUNT_READ->value)) {
             $vote?->addReason('The user does not have read access to this resource.');
 
             return false;
         }
 
-        if($subject->getOwner()->getId() !== $user->getId()) {
+        // Transactions have no owner: ownership is the one of their account
+        if(!$this->security->isGranted(AccountVoter::READ, $subject->getAccount())) {
             $vote?->addReason('The user does not own this resource.');
 
             return false;
@@ -108,6 +108,14 @@ final class TransactionVoter extends Voter
 
         switch ($attribute) {
             case self::READ:
+                return true;
+            case self::UPDATE:
+                if(!$this->security->isGranted(Role::ACCOUNT_WRITE->value)) {
+                    $vote?->addReason('The user does not have write access to this resource.');
+
+                    return false;
+                }
+
                 return true;
         }
 

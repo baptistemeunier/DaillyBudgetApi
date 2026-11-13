@@ -2,10 +2,12 @@
 
 namespace App\Entity;
 
+use ApiPlatform\Metadata\ApiProperty;
 use ApiPlatform\Metadata\ApiResource;
 use ApiPlatform\Metadata\Get;
 use ApiPlatform\Metadata\GetCollection;
 use ApiPlatform\Metadata\Link;
+use ApiPlatform\Metadata\Patch;
 use App\Entity\Traits\TimestampableTrait;
 use App\Entity\Traits\UuidTrait;
 use App\Enum\Currency;
@@ -34,6 +36,12 @@ use Symfony\Component\Uid\Uuid;
             ],
             security: "is_granted('TRANSACTION_ACCOUNT_READ', request.attributes.get('id'))",
             order: ['bookingAt' => 'DESC', 'id' => 'DESC'],
+        ),
+        new Patch(
+            security: "is_granted('TRANSACTION_UPDATE', object)",
+            // The new category must be visible to the user (system category or one of theirs)
+            securityPostDenormalize: "object.getCategory() === null or is_granted('CATEGORY_READ', object.getCategory())",
+            denormalizationContext: ['groups' => ['transaction:update']],
         ),
     ],
     normalizationContext: ['groups' => ['transaction:read', 'timestamp:read']],
@@ -93,6 +101,12 @@ class Transaction
     #[ORM\ManyToOne]
     #[ORM\JoinColumn(nullable: false)]
     private ?Account $account = null;
+
+    #[ORM\ManyToOne]
+    #[ORM\JoinColumn(onDelete: 'SET NULL')]
+    #[Groups(['transaction:read', 'transaction:update'])]
+    #[ApiProperty(readableLink: false, writableLink: false)]
+    private ?Category $category = null;
 
         public function __construct()
     {
@@ -263,6 +277,18 @@ class Transaction
     public function setAccount(?Account $account): static
     {
         $this->account = $account;
+
+        return $this;
+    }
+
+    public function getCategory(): ?Category
+    {
+        return $this->category;
+    }
+
+    public function setCategory(?Category $category): static
+    {
+        $this->category = $category;
 
         return $this;
     }

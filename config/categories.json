@@ -1,0 +1,262 @@
+{
+    "version": 1,
+    "categories": [
+        {
+            "id": "housing",
+            "type": "expense",
+            "subcategories": [
+                {
+                    "id": "housing.rent_mortgage"
+                },
+                {
+                    "id": "housing.charges"
+                },
+                {
+                    "id": "housing.utilities"
+                },
+                {
+                    "id": "housing.insurance"
+                },
+                {
+                    "id": "housing.home_works"
+                }
+            ]
+        },
+        {
+            "id": "food",
+            "type": "expense",
+            "subcategories": [
+                {
+                    "id": "food.groceries"
+                },
+                {
+                    "id": "food.restaurants_bars"
+                },
+                {
+                    "id": "food.fastfood_delivery"
+                },
+                {
+                    "id": "food.canteen_snacks"
+                }
+            ]
+        },
+        {
+            "id": "transport",
+            "type": "expense",
+            "subcategories": [
+                {
+                    "id": "transport.fuel"
+                },
+                {
+                    "id": "transport.maintenance"
+                },
+                {
+                    "id": "transport.insurance"
+                },
+                {
+                    "id": "transport.tolls_parking"
+                },
+                {
+                    "id": "transport.public"
+                },
+                {
+                    "id": "transport.taxi"
+                },
+                {
+                    "id": "transport.vehicle"
+                }
+            ]
+        },
+        {
+            "id": "subscriptions",
+            "type": "expense",
+            "subcategories": [
+                {
+                    "id": "subscriptions.mobile"
+                },
+                {
+                    "id": "subscriptions.internet"
+                },
+                {
+                    "id": "subscriptions.streaming"
+                },
+                {
+                    "id": "subscriptions.software_press"
+                }
+            ]
+        },
+        {
+            "id": "shopping",
+            "type": "expense",
+            "subcategories": [
+                {
+                    "id": "shopping.clothing"
+                },
+                {
+                    "id": "shopping.electronics"
+                },
+                {
+                    "id": "shopping.beauty"
+                },
+                {
+                    "id": "shopping.other"
+                }
+            ]
+        },
+        {
+            "id": "health",
+            "type": "expense",
+            "subcategories": [
+                {
+                    "id": "health.doctors"
+                },
+                {
+                    "id": "health.pharmacy"
+                },
+                {
+                    "id": "health.dental_optical"
+                },
+                {
+                    "id": "health.paramedical"
+                },
+                {
+                    "id": "health.insurance"
+                }
+            ]
+        },
+        {
+            "id": "leisure",
+            "type": "expense",
+            "subcategories": [
+                {
+                    "id": "leisure.outings_culture"
+                },
+                {
+                    "id": "leisure.sport"
+                },
+                {
+                    "id": "leisure.hobbies"
+                }
+            ]
+        },
+        {
+            "id": "travel",
+            "type": "expense",
+            "subcategories": [
+                {
+                    "id": "travel.transport"
+                },
+                {
+                    "id": "travel.accommodation"
+                },
+                {
+                    "id": "travel.activities"
+                }
+            ]
+        },
+        {
+            "id": "kids",
+            "type": "expense",
+            "subcategories": [
+                {
+                    "id": "kids.childcare"
+                },
+                {
+                    "id": "kids.school"
+                },
+                {
+                    "id": "kids.activities"
+                },
+                {
+                    "id": "kids.supplies_allowance"
+                }
+            ]
+        },
+        {
+            "id": "pets",
+            "type": "expense",
+            "optional": true,
+            "subcategories": [
+                {
+                    "id": "pets.food_supplies"
+                },
+                {
+                    "id": "pets.vet"
+                }
+            ]
+        },
+        {
+            "id": "taxes_bank",
+            "type": "expense",
+            "subcategories": [
+                {
+                    "id": "taxes_bank.income_tax"
+                },
+                {
+                    "id": "taxes_bank.property_tax"
+                },
+                {
+                    "id": "taxes_bank.bank_fees"
+                },
+                {
+                    "id": "taxes_bank.loans"
+                }
+            ]
+        },
+        {
+            "id": "gifts",
+            "type": "expense",
+            "subcategories": [
+                {
+                    "id": "gifts.gifts"
+                },
+                {
+                    "id": "gifts.donations"
+                }
+            ]
+        },
+        {
+            "id": "misc",
+            "type": "expense",
+            "subcategories": [
+                {
+                    "id": "misc.cash"
+                },
+                {
+                    "id": "misc.uncategorized"
+                }
+            ]
+        },
+        {
+            "id": "income",
+            "type": "income",
+            "subcategories": [
+                {
+                    "id": "income.salary"
+                },
+                {
+                    "id": "income.benefits"
+                },
+                {
+                    "id": "income.refunds"
+                },
+                {
+                    "id": "income.other"
+                }
+            ]
+        },
+        {
+            "id": "internal",
+            "type": "transfer",
+            "excludeFromStats": true,
+            "subcategories": [
+                {
+                    "id": "internal.transfers"
+                },
+                {
+                    "id": "internal.savings"
+                }
+            ]
+        }
+    ]
+}
