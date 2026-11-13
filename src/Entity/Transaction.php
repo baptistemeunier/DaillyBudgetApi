@@ -47,7 +47,7 @@ class Transaction
     #[ORM\Column(length: 255)]
     private ?string $externalId = null;
 
-    #[ORM\Column(length: 255)]
+    #[ORM\Column(length: 255, nullable: true)]
     #[Groups(['transaction:read'])]
     private ?string $reference = null;
 

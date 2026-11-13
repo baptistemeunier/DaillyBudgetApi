@@ -93,19 +93,17 @@ final class AccountSyncRequestHandler
     private function syncTransactionsType(Account $account, array $externalTransactions, bool $booked): void
     {
         foreach ($externalTransactions as $transaction) {
-            foreach (['bankTransactionCode', 'transactionId', 'entryReference', 'valueDate', 'remittanceInformationUnstructured', 'transactionAmount'] as $key) {
+            foreach (['transactionId', 'valueDate', 'transactionAmount'] as $key) {
                 if(empty($transaction[$key])) {
                     throw new \LogicException(sprintf('"%s" is required.', $key));
                 }
             }
-
 
             foreach (['amount', 'currency'] as $key) {
                 if(empty($transaction['transactionAmount'][$key])) {
                     throw new \LogicException(sprintf('"%s" in transactionAmount is required.', $key));
                 }
             }
-
         }
 
         $transactions = $this->transactionRepository->findBy([
@@ -115,18 +113,19 @@ final class AccountSyncRequestHandler
         foreach ($externalTransactions as $externalTransaction) {
             $transaction = array_find($transactions, fn ($transaction) => $transaction->getExternalId() === $externalTransaction['internalTransactionId']);
 
+            $description = $this->getDescription($externalTransaction);
             if(!$transaction) {
                 $transaction = new Transaction()
                 ->setExternalId($externalTransaction['internalTransactionId'])
-                ->setReference($externalTransaction['entryReference'])
-                ->setDescription($externalTransaction['remittanceInformationUnstructured'])
+                ->setReference($externalTransaction['entryReference'] ?? null)
+                ->setDescription($description)
                 #->setDetail()
                 ->setAmount($externalTransaction['transactionAmount']['amount'])
                 ->setCurrency(Currency::from($externalTransaction['transactionAmount']['currency']))
                 ->setValueAt($externalTransaction['valueDate'] ? new DateTimeImmutable($externalTransaction['valueDate']) : null)
                 #->setExternalCreatedAt()
                 #->setExternalTransactionType()
-                ->setExternalTransactionCode($externalTransaction['bankTransactionCode'])
+                ->setExternalTransactionCode($externalTransaction['bankTransactionCode'] ?? null)
                 ->setAccount($account)
                 ->setRawData($externalTransaction);
 
@@ -137,5 +136,18 @@ final class AccountSyncRequestHandler
                 ->setBookingAt(!empty($externalTransaction['bookingDate']) ? new DateTimeImmutable($externalTransaction['bookingDate']) : null)
                 ->setIsBooked($booked);
         }
+    }
+
+    private function getDescription(array $transaction): string
+    {
+        if(!empty($transaction['remittanceInformationUnstructuredArray'])) {
+            return reset($transaction['remittanceInformationUnstructuredArray']);
+        }
+
+        if(!empty($transaction['remittanceInformationUnstructured'])) {
+            return $transaction['remittanceInformationUnstructured'];
+        }
+
+        throw new \LogicException('Unable to determine transaction description.');
     }
 }
