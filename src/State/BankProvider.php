@@ -9,14 +9,20 @@ use ApiPlatform\State\Pagination\Pagination;
 use ApiPlatform\State\ProviderInterface;
 use App\ApiResource\Bank;
 use App\Client\GoCardlessClient;
+use App\Client\GoCardlessRateLimitException;
 use Psr\Cache\InvalidArgumentException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
+use Symfony\Component\HttpKernel\Exception\ServiceUnavailableHttpException;
 use Symfony\Contracts\Cache\CacheInterface;
 use Symfony\Contracts\Cache\ItemInterface;
 use Symfony\Contracts\HttpClient\Exception\ClientExceptionInterface;
 
 class BankProvider implements ProviderInterface
 {
+    private const string CACHE_KEY = 'BANKS_ALL';
+    private const int CACHE_TTL = 86400; // 24h: the institution list rarely changes
+
+
     public function __construct(
         private GoCardlessClient $goCardlessClient,
         private CacheInterface $cache,
@@ -62,15 +68,22 @@ class BankProvider implements ProviderInterface
      */
     public function getBanks(): mixed
     {
-        $banks = $this->cache->get("BANKS_ALL", function (ItemInterface $item) {
-            $institutions = $this->goCardlessClient->getInstitutions();
+        try {
+            return $this->cache->get(self::CACHE_KEY, function (ItemInterface $item) {
+                $institutions = $this->goCardlessClient->getInstitutions();
 
-            $item->expiresAfter(1200);
+                $item->expiresAfter(self::CACHE_TTL);
 
-            return array_map(function ($institution) {
-                return Bank::fromInstitution($institution);
-            }, $institutions);
-        });
-        return $banks;
+                return array_map(function ($institution) {
+                    return Bank::fromInstitution($institution);
+                }, $institutions);
+            });
+        } catch (GoCardlessRateLimitException $exception) {
+            throw new ServiceUnavailableHttpException(
+                $exception->retryAfter,
+                'Bank list is temporarily unavailable, please retry later.',
+                $exception
+            );
+        }
     }
 }

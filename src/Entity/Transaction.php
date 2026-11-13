@@ -33,6 +33,7 @@ use Symfony\Component\Uid\Uuid;
                 ),
             ],
             security: "is_granted('TRANSACTION_ACCOUNT_READ', request.attributes.get('id'))",
+            order: ['bookingAt' => 'DESC', 'id' => 'DESC'],
         ),
     ],
     normalizationContext: ['groups' => ['transaction:read', 'timestamp:read']],
@@ -93,7 +94,7 @@ class Transaction
     #[ORM\JoinColumn(nullable: false)]
     private ?Account $account = null;
 
-    public function __construct()
+        public function __construct()
     {
         $this->id = Uuid::v7();
     }

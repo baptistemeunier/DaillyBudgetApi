@@ -13,7 +13,7 @@ class CreateAccountConnection
     public ?string $bankId = null;
 
     #[Assert\NotBlank]
-    #[Assert\Url(protocols: ["http", "https"])]
+    #[Assert\Url(protocols: ["http", "https"], requireTld: false)]
     #[ApiProperty(example: "http://www.yourwebpage.com")]
     public ?string $redirectUri = null;
 }

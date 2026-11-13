@@ -5,6 +5,7 @@ namespace App\Client;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\Uid\Uuid;
 use Symfony\Contracts\Cache\CacheInterface;
+use Symfony\Contracts\Cache\ItemInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 use Symfony\Contracts\HttpClient\Exception\HttpExceptionInterface;
 
@@ -18,9 +19,12 @@ readonly class GoCardlessClient
         #[Autowire(env: "GOCARDLESS_CLIENT_SECRET")] private string $secretKey,
     ) {}
 
+    private const string ACCESS_TOKEN_CACHE_KEY = 'GoCardlessClient_access_token';
+    private const int DEFAULT_RETRY_AFTER = 60;
+
     public function getAccessToken(): string
     {
-        return $this->cache->get('GoCardlessClient_access_token', function () {
+        return $this->cache->get(self::ACCESS_TOKEN_CACHE_KEY, function (ItemInterface $item) {
             $response = $this->httpClient->request(
                 'POST',
                 $this->baseUrl . '/api/v2/token/new/',
@@ -33,6 +37,9 @@ readonly class GoCardlessClient
             );
 
             $data = $response->toArray();
+
+            // Expire the cached token a minute before GoCardless does (access_expires is in seconds, 24h by default).
+            $item->expiresAfter(max(60, (int) ($data['access_expires'] ?? 86400) - 60));
 
             return $data['access'];
         });
@@ -56,21 +63,48 @@ readonly class GoCardlessClient
             return $response->toArray();
 
         } catch (HttpExceptionInterface $exception) {
-            if ($exception->getResponse()->getStatusCode() === 401) {
-                $options['headers']['Authorization'] =
-                    'Bearer ' . $this->getAccessToken();
-
-                $response = $this->httpClient->request(
-                    $method,
-                    $this->baseUrl . $endpoint,
-                    $options
-                );
-
-                return $response->toArray();
+            if ($exception->getResponse()->getStatusCode() !== 401) {
+                throw $this->convertException($exception);
             }
-
-            throw $exception;
         }
+
+        // Token expired or revoked: drop it from the cache and retry once with a fresh one.
+        $this->cache->delete(self::ACCESS_TOKEN_CACHE_KEY);
+        $options['headers']['Authorization'] =
+            'Bearer ' . $this->getAccessToken();
+
+        try {
+            $response = $this->httpClient->request(
+                $method,
+                $this->baseUrl . $endpoint,
+                $options
+            );
+
+            return $response->toArray();
+        } catch (HttpExceptionInterface $exception) {
+            throw $this->convertException($exception);
+        }
+    }
+
+    private function convertException(HttpExceptionInterface $exception): \Throwable
+    {
+        $response = $exception->getResponse();
+
+        if ($response->getStatusCode() !== 429) {
+            return $exception;
+        }
+
+        // GoCardless exposes the reset delay (seconds) under non-standard header names.
+        $headers = $response->getHeaders(false);
+        $retryAfter = self::DEFAULT_RETRY_AFTER;
+        foreach (['retry-after', 'x-ratelimit-reset', 'http_x_ratelimit_reset'] as $name) {
+            if (isset($headers[$name][0]) && is_numeric($headers[$name][0])) {
+                $retryAfter = max(1, (int) $headers[$name][0]);
+                break;
+            }
+        }
+
+        return new GoCardlessRateLimitException($retryAfter, $exception);
     }
 
     public function getInstitutions(array $filters = []): array {

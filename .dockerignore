@@ -1,0 +1,14 @@
+.git
+.idea
+.claude
+docs
+vendor
+var
+public/bundles
+compose*.yaml
+Dockerfile
+.dockerignore
+.env.local
+.env.local.php
+.env.*.local
+*.md
