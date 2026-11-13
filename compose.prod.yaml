@@ -1,0 +1,102 @@
+# Production stack: front (Nuxt) + api (Symfony/FrankenPHP) + worker (Messenger) + MariaDB.
+# Images are built and pushed to a private registry by bin/release.sh (see docs/DEPLOY.md).
+#   cp stack.env.example stack.env    # fill in the secrets
+#   docker compose -f compose.prod.yaml --env-file stack.env up -d
+# Only the front is published; it proxies /api/* to the API on the internal network.
+
+x-api-env: &api-env
+  APP_SECRET: ${APP_SECRET:?}
+  DEFAULT_URI: ${DEFAULT_URI:-http://localhost}
+  DATABASE_URL: mysql://${DB_USER:-app}:${DB_PASSWORD:?}@database:3306/${DB_NAME:-app}?serverVersion=11.8.6-MariaDB&charset=utf8mb4
+  MESSENGER_TRANSPORT_DSN: doctrine://default?auto_setup=0
+  OAUTH2_CONFIGURATION_URL: ${OAUTH2_CONFIGURATION_URL:?}
+  OAUTH2_CLIENT_ID: ${OAUTH2_CLIENT_ID:?}
+  GOCARDLESS_BASE_URL: ${GOCARDLESS_BASE_URL:-https://bankaccountdata.gocardless.com}
+  GOCARDLESS_CLIENT_ID: ${GOCARDLESS_CLIENT_ID:?}
+  GOCARDLESS_CLIENT_SECRET: ${GOCARDLESS_CLIENT_SECRET:?}
+
+x-logging: &logging
+  driver: json-file
+  options: { max-size: 10m, max-file: "3" }
+
+services:
+  front:
+    image: ${REGISTRY:?}/daily-budget-front:${TAG:-latest}
+    pull_policy: always
+    restart: unless-stopped
+    environment:
+      NUXT_API_BASE_URL: http://api
+      NUXT_OAUTH_TOKEN_URL: ${NUXT_OAUTH_TOKEN_URL:?}
+      NUXT_OAUTH_CLIENT_SECRET: ${NUXT_OAUTH_CLIENT_SECRET:-}
+      NUXT_PUBLIC_OAUTH_CLIENT_ID: ${NUXT_PUBLIC_OAUTH_CLIENT_ID:?}
+      NUXT_PUBLIC_OAUTH_AUTHORIZE_URL: ${NUXT_PUBLIC_OAUTH_AUTHORIZE_URL:-https://auth.meunier.ovh/oauth/authorize}
+    ports:
+      - "${FRONT_PORT:-3000}:3000"
+    depends_on:
+      api: { condition: service_healthy }
+    mem_limit: 256m
+    logging: *logging
+
+  api:
+    image: ${REGISTRY:?}/daily-budget-api:${TAG:-latest}
+    pull_policy: always
+    restart: unless-stopped
+    environment: *api-env
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:2019/config/"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    # Uncomment to reach the API (Swagger UI) directly
+    # ports: ["8000:80"]
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+    mem_limit: 512m
+    logging: *logging
+
+  worker:
+    image: ${REGISTRY:?}/daily-budget-api:${TAG:-latest}
+    pull_policy: always
+    restart: unless-stopped
+    environment: *api-env
+    command: ["php", "bin/console", "messenger:consume", "async", "--time-limit=3600", "--memory-limit=128M"]
+    healthcheck: { disable: true }
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+    mem_limit: 256m
+    logging: *logging
+
+  migrate:
+    image: ${REGISTRY:?}/daily-budget-api:${TAG:-latest}
+    pull_policy: always
+    environment: *api-env
+    command: ["php", "bin/console", "doctrine:migrations:migrate", "--no-interaction", "--allow-no-migration"]
+    healthcheck: { disable: true }
+    restart: "no"
+    depends_on:
+      database: { condition: service_healthy }
+
+  database:
+    image: docker.io/library/mariadb:11.8
+    restart: unless-stopped
+    environment:
+      MARIADB_DATABASE: ${DB_NAME:-app}
+      MARIADB_USER: ${DB_USER:-app}
+      MARIADB_PASSWORD: ${DB_PASSWORD:?}
+      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:?}
+      MARIADB_AUTO_UPGRADE: "1"
+    # Small footprint for a single-user app
+    command: ["--innodb-buffer-pool-size=64M", "--performance-schema=OFF", "--skip-name-resolve"]
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    volumes:
+      - database_data:/var/lib/mysql
+    mem_limit: 256m
+    logging: *logging
+
+volumes:
+  database_data:

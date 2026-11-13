@@ -12,3 +12,6 @@ Dockerfile
 .env.local.php
 .env.*.local
 *.md
+stack.env*
+.env.prod
+.env.prod.local
