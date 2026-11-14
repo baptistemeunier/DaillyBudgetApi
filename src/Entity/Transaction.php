@@ -2,12 +2,14 @@
 
 namespace App\Entity;
 
+use ApiPlatform\Doctrine\Orm\Filter\DateFilter;
 use ApiPlatform\Metadata\ApiResource;
 use ApiPlatform\Metadata\Get;
 use ApiPlatform\Metadata\GetCollection;
 use ApiPlatform\Metadata\Link;
 use ApiPlatform\Metadata\Patch;
 use ApiPlatform\Metadata\QueryParameter;
+use App\Doctrine\Filter\SplitCategoryFilter;
 use App\Doctrine\Filter\UncategorizedFilter;
 use App\Entity\Traits\TimestampableTrait;
 use App\Entity\Traits\UuidTrait;
@@ -54,6 +56,18 @@ use Symfony\Component\Validator\Constraints as Assert;
                     filter: new UncategorizedFilter(),
                     schema: ['type' => 'boolean'],
                     description: 'true: only the transactions not fully categorized (sum of the splits ≠ amount)',
+                ),
+                'category' => new QueryParameter(
+                    filter: new SplitCategoryFilter(),
+                    schema: ['type' => 'string'],
+                    description: 'Category UUID or IRI: only the transactions with a split on exactly this category',
+                ),
+                // ?bookingAt[after]=2026-10-01&bookingAt[strictly_before]=2026-12-01
+                // (whole months of a statement: strictly_before the 1st of the month after "to")
+                'bookingAt' => new QueryParameter(
+                    filter: new DateFilter(),
+                    property: 'bookingAt',
+                    description: 'Booking date bounds: bookingAt[after|before|strictly_after|strictly_before]=<date>',
                 ),
             ],
         ),

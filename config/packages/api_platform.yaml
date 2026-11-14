@@ -36,3 +36,5 @@ api_platform:
             account:write: 'Write Account'
             #category:read: 'Read Category'
             category:write: 'Write Category'
+            #budget:read: 'Read Budget'
+            budget:write: 'Write Budget'

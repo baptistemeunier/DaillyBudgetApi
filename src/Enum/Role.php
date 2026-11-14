@@ -10,4 +10,6 @@ enum Role: string
     case ACCOUNT_WRITE = 'ROLE_account:write';
     case CATEGORY_READ = 'ROLE_category:read';
     case CATEGORY_WRITE = 'ROLE_category:write';
+    case BUDGET_READ = 'ROLE_budget:read';
+    case BUDGET_WRITE = 'ROLE_budget:write';
 }

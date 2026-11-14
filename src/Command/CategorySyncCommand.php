@@ -4,6 +4,7 @@ namespace App\Command;
 
 use App\Entity\Category;
 use App\Enum\CategoryType;
+use App\Repository\BudgetLineRepository;
 use App\Repository\CategoryRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Console\Attribute\AsCommand;
@@ -23,6 +24,7 @@ final readonly class CategorySyncCommand
 {
     public function __construct(
         private CategoryRepository $categoryRepository,
+        private BudgetLineRepository $budgetLineRepository,
         private EntityManagerInterface $entityManager,
         #[Autowire('%kernel.project_dir%/config/categories.json')]
         private string $catalogPath,
@@ -90,6 +92,12 @@ final readonly class CategorySyncCommand
         }
 
         $this->entityManager->flush();
+
+        // Budgets only take active root expense categories: drop the lines the catalog change made invalid
+        $removedLines = $this->budgetLineRepository->deleteInvalidLines();
+        if ($removedLines > 0) {
+            $io->note(sprintf('%d budget lines removed (category deleted or no longer a root expense category).', $removedLines));
+        }
 
         $io->success(sprintf(
             'Catalog v%s: %d categories (%d created, %d soft-deleted).',

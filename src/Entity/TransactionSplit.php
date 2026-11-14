@@ -27,7 +27,7 @@ class TransactionSplit
     #[ORM\ManyToOne]
     #[ORM\JoinColumn(onDelete: 'SET NULL')]
     #[Groups(['transaction:read', 'transaction:update'])]
-    #[ApiProperty(readableLink: false, writableLink: false)]
+    #[ApiProperty(writableLink: false)] // IRI on input; output as a HAL link by the normalizer
     private ?Category $category = null;
 
     #[ORM\Column(type: Types::DECIMAL, precision: 15, scale: 2)]

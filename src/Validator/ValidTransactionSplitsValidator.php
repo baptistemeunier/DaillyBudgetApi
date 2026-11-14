@@ -3,6 +3,7 @@
 namespace App\Validator;
 
 use App\Entity\Transaction;
+use App\Util\Money;
 use Symfony\Component\Validator\Constraint;
 use Symfony\Component\Validator\ConstraintValidator;
 use Symfony\Component\Validator\Exception\UnexpectedTypeException;
@@ -25,19 +26,19 @@ final class ValidTransactionSplitsValidator extends ConstraintValidator
         }
 
         $splits = $value->getSplits();
-        if ($splits->isEmpty() || null === $value->getAmount() || !self::isDecimal($value->getAmount())) {
+        if ($splits->isEmpty() || null === $value->getAmount() || !Money::isDecimal($value->getAmount())) {
             return;
         }
 
-        $amount = self::toCents($value->getAmount());
+        $amount = Money::toCents($value->getAmount());
         $total = 0;
         $categories = [];
         foreach ($splits as $split) {
-            if (null === $split->getAmount() || !self::isDecimal($split->getAmount())) {
+            if (null === $split->getAmount() || !Money::isDecimal($split->getAmount())) {
                 return; // reported by the TransactionSplit constraints
             }
 
-            $cents = self::toCents($split->getAmount());
+            $cents = Money::toCents($split->getAmount());
             if (0 === $cents || ($cents < 0) !== ($amount < 0)) {
                 $this->context->buildViolation($constraint->signMessage)
                     ->atPath('splits')
@@ -68,27 +69,10 @@ final class ValidTransactionSplitsValidator extends ConstraintValidator
         // A partial categorization is allowed, but not more than the transaction amount.
         if (abs($total) > abs($amount)) {
             $this->context->buildViolation($constraint->totalMessage)
-                ->setParameter('{{ total }}', number_format($total / 100, 2, '.', ''))
+                ->setParameter('{{ total }}', Money::fromCents($total))
                 ->setParameter('{{ amount }}', $value->getAmount())
                 ->atPath('splits')
                 ->addViolation();
         }
-    }
-
-    private static function isDecimal(string $amount): bool
-    {
-        return 1 === preg_match('/^-?\d+(\.\d{1,2})?$/', $amount);
-    }
-
-    /**
-     * Exact conversion of a decimal string ("-12.3") to cents (-1230), without float rounding.
-     */
-    private static function toCents(string $amount): int
-    {
-        $negative = str_starts_with($amount, '-');
-        [$units, $decimals] = explode('.', ltrim($amount, '-') . '.', 3);
-        $cents = (int) $units * 100 + (int) str_pad(substr($decimals, 0, 2), 2, '0');
-
-        return $negative ? -$cents : $cents;
     }
 }
