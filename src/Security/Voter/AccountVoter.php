@@ -13,6 +13,7 @@ use Symfony\Component\Security\Core\User\UserInterface;
 final class AccountVoter extends Voter
 {
     public const READ = 'ACCOUNT_READ';
+    public const EDIT = 'ACCOUNT_EDIT';
 
     public function __construct(private Security $security)
     {
@@ -27,7 +28,7 @@ final class AccountVoter extends Voter
         }
 
         // Object validation
-        return in_array($attribute, [self::READ])
+        return in_array($attribute, [self::READ, self::EDIT])
             && $subject instanceof Account;
     }
 
@@ -85,6 +86,14 @@ final class AccountVoter extends Voter
 
         switch ($attribute) {
             case self::READ:
+                return true;
+            case self::EDIT:
+                if(!$this->security->isGranted(Role::ACCOUNT_WRITE->value)) {
+                    $vote?->addReason('The user does not have write access to this resource.');
+
+                    return false;
+                }
+
                 return true;
         }
 

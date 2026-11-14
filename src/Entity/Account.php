@@ -6,6 +6,7 @@ use ApiPlatform\Doctrine\Orm\Filter\UuidFilter;
 use ApiPlatform\Metadata\ApiResource;
 use ApiPlatform\Metadata\Get;
 use ApiPlatform\Metadata\GetCollection;
+use ApiPlatform\Metadata\Patch;
 use ApiPlatform\Metadata\QueryParameter;
 use App\Entity\Traits\DeletableTrait;
 use App\Entity\Traits\TimestampableTrait;
@@ -17,6 +18,7 @@ use Doctrine\ORM\Mapping as ORM;
 use Symfony\Bridge\Doctrine\Validator\Constraints\UniqueEntity;
 use Symfony\Component\Serializer\Attribute\Groups;
 use Symfony\Component\Uid\Uuid;
+use Symfony\Component\Validator\Constraints as Assert;
 
 #[ORM\Entity(repositoryClass: AccountRepository::class)]
 #[ORM\UniqueConstraint(name: 'UNIQ_EXTERNAL_ID', columns: ['external_id'])]
@@ -33,6 +35,10 @@ use Symfony\Component\Uid\Uuid;
                     castToArray: false,
                 ),
             ],
+        ),
+        new Patch(
+            denormalizationContext: ['groups' => ['account:update']],
+            security: "is_granted('ACCOUNT_EDIT', object)",
         ),
     ],
     normalizationContext: ['groups' => ['account:read', 'timestamp:read']],
@@ -51,6 +57,14 @@ class Account
     #[ORM\Column(length: 255)]
     #[Groups(['account:read'])]
     private ?string $name = null;
+
+    /**
+     * Name chosen by the user, displayed instead of the bank's name when set.
+     */
+    #[ORM\Column(length: 255, nullable: true)]
+    #[Groups(['account:read', 'account:update'])]
+    #[Assert\Length(max: 255)]
+    private ?string $displayName = null;
 
     #[ORM\Column(length: 255, nullable: true)]
     #[Groups(['account:read'])]
@@ -107,6 +121,20 @@ class Account
     public function setName(string $name): static
     {
         $this->name = $name;
+
+        return $this;
+    }
+
+    public function getDisplayName(): ?string
+    {
+        return $this->displayName;
+    }
+
+    public function setDisplayName(?string $displayName): static
+    {
+        // An empty name falls back to the bank's name
+        $displayName = $displayName !== null ? trim($displayName) : null;
+        $this->displayName = $displayName !== '' ? $displayName : null;
 
         return $this;
     }
