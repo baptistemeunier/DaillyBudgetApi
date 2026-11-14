@@ -30,6 +30,32 @@ class TransactionSplit
     #[ApiProperty(writableLink: false)] // IRI on input; output as a HAL link by the normalizer
     private ?Category $category = null;
 
+    /**
+     * Saving splits only: the mirror transaction on the manual account (and, on the mirror, the origin).
+     * Set by SavingMirrorLinker, output as a HAL link by the normalizer.
+     */
+    #[ORM\ManyToOne]
+    #[ORM\JoinColumn(onDelete: 'SET NULL')]
+    #[Groups(['transaction:read'])]
+    private ?Transaction $counterpartTransaction = null;
+
+    /**
+     * Input only, not stored: manual account (savings / investment) where SavingMirrorLinker keeps the mirror transaction.
+     * Saving splits only; omitted on a later PATCH, the previous mirror of the category is kept.
+     */
+    #[Groups(['transaction:update'])]
+    #[ApiProperty(writableLink: false, readable: false)]
+    private ?Account $counterpartAccount = null;
+
+    /**
+     * Input only, not stored: amount received on the manual counterpartAccount when its currency differs
+     * from the transaction's (opposite sign). Same currency: the mirror is always the opposite of the split.
+     */
+    #[Groups(['transaction:update'])]
+    #[ApiProperty(readable: false)]
+    #[Assert\Regex('/^-?\d{1,13}(\.\d{1,2})?$/', message: 'The amount must be a decimal with at most 2 digits.')]
+    private ?string $counterpartAmount = null;
+
     #[ORM\Column(type: Types::DECIMAL, precision: 15, scale: 2)]
     #[Groups(['transaction:read', 'transaction:update'])]
     #[Assert\NotBlank]
@@ -61,6 +87,42 @@ class TransactionSplit
     public function setCategory(?Category $category): static
     {
         $this->category = $category;
+
+        return $this;
+    }
+
+    public function getCounterpartTransaction(): ?Transaction
+    {
+        return $this->counterpartTransaction;
+    }
+
+    public function setCounterpartTransaction(?Transaction $counterpartTransaction): static
+    {
+        $this->counterpartTransaction = $counterpartTransaction;
+
+        return $this;
+    }
+
+    public function getCounterpartAccount(): ?Account
+    {
+        return $this->counterpartAccount;
+    }
+
+    public function setCounterpartAccount(?Account $counterpartAccount): static
+    {
+        $this->counterpartAccount = $counterpartAccount;
+
+        return $this;
+    }
+
+    public function getCounterpartAmount(): ?string
+    {
+        return $this->counterpartAmount;
+    }
+
+    public function setCounterpartAmount(?string $counterpartAmount): static
+    {
+        $this->counterpartAmount = $counterpartAmount;
 
         return $this;
     }

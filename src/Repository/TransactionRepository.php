@@ -2,6 +2,7 @@
 
 namespace App\Repository;
 
+use App\Entity\Account;
 use App\Entity\Transaction;
 use App\Entity\TransactionSplit;
 use App\Entity\User;
@@ -155,6 +156,19 @@ class TransactionRepository extends ServiceEntityRepository
         )->getQuery()->getSingleResult();
 
         return array_map(static fn ($value) => (string) $value, $totals + $categorized);
+    }
+
+    /**
+     * Sum of the transactions of the account (balance of a manual account).
+     */
+    public function sumByAccount(Account $account): string
+    {
+        return (string) ($this->createQueryBuilder('t')
+            ->select('COALESCE(SUM(t.amount), 0)')
+            ->andWhere('t.account = :account')
+            ->setParameter('account', $account->getId(), UuidType::NAME)
+            ->getQuery()
+            ->getSingleScalarResult());
     }
 
     /**

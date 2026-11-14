@@ -47,13 +47,16 @@ class AccountHalNormalizer implements NormalizerInterface, NormalizerAwareInterf
             ];
         }
 
-        $normalized['_links']['syncs'] = [
-            'href' => $this->router->generate(
-                // Custom uriTemplate: the route name has no {._format}
-                '_api_/accounts/{id}/syncs_get_collection',
-                ['id' => $data->getId()],
-            )
-        ];
+        // A manual account is never synced
+        if(!$data->isManual()) {
+            $normalized['_links']['syncs'] = [
+                'href' => $this->router->generate(
+                    // Custom uriTemplate: the route name has no {._format}
+                    '_api_/accounts/{id}/syncs_get_collection',
+                    ['id' => $data->getId()],
+                )
+            ];
+        }
 
         return $normalized;
     }

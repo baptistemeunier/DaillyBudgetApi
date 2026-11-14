@@ -174,9 +174,16 @@
             "excludeFromStats": true,
             "name": { "fr": "Mouvements internes", "en": "Internal transfers" },
             "subcategories": [
-                { "id": "internal.transfers", "name": { "fr": "Virements entre comptes", "en": "Transfers between accounts" } },
-                { "id": "internal.savings", "name": { "fr": "Épargne & placements", "en": "Savings & investments" } }
+                { "id": "internal.transfers", "name": { "fr": "Virements entre comptes", "en": "Transfers between accounts" } }
             ]
+        },
+        {
+            "id": "saving",
+            "emoji": "🐷",
+            "type": "saving",
+            "excludeFromStats": true,
+            "name": { "fr": "Épargne", "en": "Savings" },
+            "subcategories": []
         }
     ]
 }

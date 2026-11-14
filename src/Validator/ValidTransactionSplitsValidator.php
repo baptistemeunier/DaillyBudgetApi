@@ -3,6 +3,8 @@
 namespace App\Validator;
 
 use App\Entity\Transaction;
+use App\Entity\TransactionSplit;
+use App\Enum\CategoryType;
 use App\Util\Money;
 use Symfony\Component\Validator\Constraint;
 use Symfony\Component\Validator\ConstraintValidator;
@@ -57,7 +59,10 @@ final class ValidTransactionSplitsValidator extends ConstraintValidator
                     ->addViolation();
             }
 
-            $category = $splitCategory?->getId()?->toRfc4122();
+            $this->validateCounterpart($value, $split, $constraint);
+
+            // Saving categories may be reused (one split per manual account)
+            $category = $splitCategory?->getType() === CategoryType::SAVING ? null : $splitCategory?->getId()?->toRfc4122();
             if (null !== $category && isset($categories[$category])) {
                 $this->context->buildViolation($constraint->duplicateCategoryMessage)
                     ->atPath('splits')
@@ -71,6 +76,61 @@ final class ValidTransactionSplitsValidator extends ConstraintValidator
             $this->context->buildViolation($constraint->totalMessage)
                 ->setParameter('{{ total }}', Money::fromCents($total))
                 ->setParameter('{{ amount }}', $value->getAmount())
+                ->atPath('splits')
+                ->addViolation();
+        }
+    }
+
+    /**
+     * counterpartAccount only on a saving split; counterpartAccount must be
+     * another active manual account; counterpartAmount only towards a manual account in another currency,
+     * with the opposite sign. The rest is checked by SavingMirrorLinker.
+     */
+    private function validateCounterpart(Transaction $transaction, TransactionSplit $split, ValidTransactionSplits $constraint): void
+    {
+        $account = $split->getCounterpartAccount();
+
+        if ($account && $split->getCategory()?->getType() !== CategoryType::SAVING) {
+            $this->context->buildViolation($constraint->counterpartCategoryMessage)
+                ->atPath('splits')
+                ->addViolation();
+
+            return;
+        }
+
+        $counterpartAmount = $split->getCounterpartAmount();
+        if (null !== $counterpartAmount && !$account) {
+            $this->context->buildViolation($constraint->counterpartAmountWithoutAccountMessage)
+                ->atPath('splits')
+                ->addViolation();
+
+            return;
+        }
+
+        if (!$account) {
+            return;
+        }
+
+        if (!$account->isManual() || $account->getDeletedAt() || $account === $transaction->getAccount()) {
+            $this->context->buildViolation($constraint->counterpartAccountMessage)
+                ->atPath('splits')
+                ->addViolation();
+
+            return;
+        }
+
+        if (null === $counterpartAmount || !Money::isDecimal($counterpartAmount)) {
+            return; // required between currencies: checked by SavingMirrorLinker (a previous mirror can be kept)
+        }
+
+        // Same currency: the mirror is always the opposite of the split
+        if ($account->getBalanceCurrency() === $transaction->getCurrency()) {
+            $this->context->buildViolation($constraint->counterpartAmountSameCurrencyMessage)
+                ->atPath('splits')
+                ->addViolation();
+        } elseif (0 === Money::toCents($counterpartAmount)
+            || (Money::toCents($counterpartAmount) < 0) === (Money::toCents($split->getAmount()) < 0)) {
+            $this->context->buildViolation($constraint->counterpartAmountSignMessage)
                 ->atPath('splits')
                 ->addViolation();
         }

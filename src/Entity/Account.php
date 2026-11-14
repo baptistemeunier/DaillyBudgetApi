@@ -7,6 +7,7 @@ use ApiPlatform\Metadata\ApiResource;
 use ApiPlatform\Metadata\Get;
 use ApiPlatform\Metadata\GetCollection;
 use ApiPlatform\Metadata\Patch;
+use ApiPlatform\Metadata\Post;
 use ApiPlatform\Metadata\QueryParameter;
 use App\Entity\Traits\DeletableTrait;
 use App\Entity\Traits\TimestampableTrait;
@@ -14,7 +15,10 @@ use App\Entity\Traits\UuidTrait;
 use App\Enum\AccountStatus;
 use App\Enum\AccountSyncStatus;
 use App\Enum\AccountType;
+use App\Dto\CreateManualAccount;
 use App\Enum\Currency;
+use App\State\AccountProcessor;
+use App\Validator\ValidAccountType;
 use App\Repository\AccountRepository;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
@@ -39,6 +43,12 @@ use Symfony\Component\Validator\Constraints as Assert;
                 ),
             ],
         ),
+        // Manual account (savings / investment): no sync, starts with an initial transaction
+        new Post(
+            security: "is_granted('ACCOUNT_CREATE')",
+            input: CreateManualAccount::class,
+            processor: AccountProcessor::class,
+        ),
         new Patch(
             denormalizationContext: ['groups' => ['account:update']],
             security: "is_granted('ACCOUNT_EDIT', object)",
@@ -47,6 +57,7 @@ use Symfony\Component\Validator\Constraints as Assert;
     normalizationContext: ['groups' => ['account:read', 'timestamp:read']],
 )]
 #[UniqueEntity('externalId')]
+#[ValidAccountType]
 class Account
 {
     use UuidTrait;
@@ -80,7 +91,8 @@ class Account
     #[Groups(['account:read'])]
     private ?string $iban = null;
 
-    #[ORM\Column(length: 255)]
+    // Null for a manual account
+    #[ORM\Column(length: 255, nullable: true)]
     private ?string $bankId = null;
 
     #[ORM\Column(type: 'uuid', nullable: true)]
@@ -98,7 +110,8 @@ class Account
     #[ORM\JoinColumn(nullable: false)]
     private ?User $owner = null;
 
-    #[ORM\Column(enumType: AccountSyncStatus::class)]
+    // Null for a manual account
+    #[ORM\Column(nullable: true, enumType: AccountSyncStatus::class)]
     #[Groups(['account:read'])]
     private ?AccountSyncStatus $synchronizedStatus = null;
 
@@ -134,6 +147,16 @@ class Account
     public function __construct()
     {
         $this->id = Uuid::v7();
+    }
+
+    /**
+     * Manual account (savings / investment created through POST /accounts): never synced,
+     * its transactions are the initial one and the mirrors of the transfers.
+     */
+    #[Groups(['account:read'])]
+    public function isManual(): bool
+    {
+        return null === $this->externalId;
     }
 
     public function getBalance(): ?string
@@ -233,7 +256,7 @@ class Account
         return $this->bankId;
     }
 
-    public function setBankId(string $bankId): static
+    public function setBankId(?string $bankId): static
     {
         $this->bankId = $bankId;
 

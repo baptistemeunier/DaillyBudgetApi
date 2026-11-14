@@ -252,11 +252,14 @@
             "subcategories": [
                 {
                     "id": "internal.transfers"
-                },
-                {
-                    "id": "internal.savings"
                 }
             ]
+        },
+        {
+            "id": "saving",
+            "type": "saving",
+            "excludeFromStats": true,
+            "subcategories": []
         }
     ]
 }

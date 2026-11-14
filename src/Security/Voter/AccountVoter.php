@@ -14,6 +14,7 @@ final class AccountVoter extends Voter
 {
     public const READ = 'ACCOUNT_READ';
     public const EDIT = 'ACCOUNT_EDIT';
+    public const CREATE = 'ACCOUNT_CREATE';
 
     public function __construct(private Security $security)
     {
@@ -23,7 +24,7 @@ final class AccountVoter extends Voter
     protected function supports(string $attribute, mixed $subject): bool
     {
         // Generic validation
-        if(!$subject && in_array($attribute, [self::READ])) {
+        if(!$subject && in_array($attribute, [self::READ, self::CREATE])) {
             return true;
         }
 
@@ -58,6 +59,14 @@ final class AccountVoter extends Voter
             case self::READ:
                 if(!$this->security->isGranted(Role::ACCOUNT_READ->value)) {
                     $vote?->addReason('The user does not have read access to this kind of resource.');
+
+                    return false;
+                }
+
+                return true;
+            case self::CREATE:
+                if(!$this->security->isGranted(Role::ACCOUNT_WRITE->value)) {
+                    $vote?->addReason('The user does not have write access to this kind of resource.');
 
                     return false;
                 }

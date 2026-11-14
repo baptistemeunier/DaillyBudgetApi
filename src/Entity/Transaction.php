@@ -15,6 +15,7 @@ use App\Entity\Traits\TimestampableTrait;
 use App\Entity\Traits\UuidTrait;
 use App\Enum\Currency;
 use App\Repository\TransactionRepository;
+use App\State\TransactionProcessor;
 use App\Validator\ValidTransactionSplits;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
@@ -76,6 +77,7 @@ use Symfony\Component\Validator\Constraints as Assert;
             // Checks the new splits: their categories must be visible to the user
             security: "is_granted('TRANSACTION_UPDATE', object)",
             securityPostDenormalize: "is_granted('TRANSACTION_UPDATE', object)",
+            processor: TransactionProcessor::class,
         ),
     ],
     normalizationContext: ['groups' => ['transaction:read', 'timestamp:read']],
@@ -86,7 +88,7 @@ class Transaction
     use UuidTrait;
     use TimestampableTrait;
 
-    #[ORM\Column(length: 255)]
+    #[ORM\Column(length: 255, nullable: true)]
     private ?string $externalId = null;
 
     #[ORM\Column(length: 255, nullable: true)]
