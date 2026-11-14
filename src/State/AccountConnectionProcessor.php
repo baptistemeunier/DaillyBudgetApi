@@ -7,6 +7,7 @@ use ApiPlatform\Metadata\Operation;
 use ApiPlatform\Metadata\Patch;
 use ApiPlatform\Metadata\Post;
 use ApiPlatform\State\ProcessorInterface;
+use App\Client\GoCardlessAccessExpiredException;
 use App\Client\GoCardlessClient;
 use App\Dto\CreateAccountConnection;
 use App\Entity\Account;
@@ -20,6 +21,7 @@ use App\Message\AccountSyncRequest;
 use App\Repository\AccountRepository;
 use App\Repository\AccountSyncRepository;
 use Doctrine\ORM\EntityManagerInterface;
+use Psr\Log\LoggerInterface;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\Messenger\MessageBusInterface;
@@ -33,7 +35,8 @@ readonly class AccountConnectionProcessor implements ProcessorInterface
         private AccountSyncRepository $accountSyncRepository,
         private EntityManagerInterface $entityManager,
         private Security $security,
-        private MessageBusInterface $bus
+        private MessageBusInterface $bus,
+        private LoggerInterface $logger,
     )
     {
 
@@ -102,20 +105,35 @@ readonly class AccountConnectionProcessor implements ProcessorInterface
      */
     public function syncConnection(AccountConnection $accountConnection): AccountConnection
     {
+        // Expired agreement: every GoCardless call would fail, the user must reconnect (delete + new connection)
+        if ($accountConnection->getExternalStatus() === RequisitionStatus::EXPIRED) {
+            return $accountConnection;
+        }
+
         $requisition = $this->goCardlessClient->getRequisition($accountConnection->getExternalId());
 
-        $accounts = $this->accountRepository->findBy([
-            'accountConnection' => $accountConnection
-        ]);
+        // Look up by external id across all the user's accounts: after a reconnection (expired agreement),
+        // GoCardless returns the same account ids and the existing accounts are re-attached to this connection.
+        $accounts = $this->accountRepository->findByOwnerAndExternalIds(
+            $accountConnection->getOwner(),
+            array_map(Uuid::fromString(...), $requisition['accounts']),
+        );
         $accountsWithOngoingSync = $this->accountSyncRepository->findAccountsWithOngoingSync($accountConnection);
 
         $syncs = [];
+        $expired = false;
         foreach ($requisition['accounts'] as $accountId) {
             $account = array_find($accounts, function (Account $account) use ($accountId) {
                 return $account->getExternalId()->equals(Uuid::fromString($accountId));
             });
 
-            $externalAccount = $this->goCardlessClient->getAccount($accountId);
+            try {
+                $externalAccount = $this->goCardlessClient->getAccount($accountId);
+            } catch (GoCardlessAccessExpiredException) {
+                $expired = true;
+                $account?->setExternalStatus(AccountStatus::EXPIRED);
+                continue;
+            }
 
             if(!$account) {
                 $account = new Account()
@@ -123,15 +141,20 @@ readonly class AccountConnectionProcessor implements ProcessorInterface
                     ->setIban($externalAccount['iban'])
                     ->setOwner($accountConnection->getOwner())
                     ->setExternalId(Uuid::fromString($externalAccount['id']))
-                    ->setBankId($externalAccount['institution_id'])
-                    ->setAccountConnection($accountConnection);
+                    ->setBankId($externalAccount['institution_id']);
 
                 $this->entityManager->persist($account);
             }
 
             $account
+                ->setAccountConnection($accountConnection)
                 ->setExternalUpdatedAt(new \DateTimeImmutable($externalAccount['last_accessed']))
                 ->setExternalStatus(AccountStatus::tryFrom($externalAccount['status']));
+
+            if ($account->getExternalStatus() === AccountStatus::EXPIRED) {
+                $expired = true;
+                continue;
+            }
 
             // A synchronization is already queued or running: nothing to do
             if(in_array($account, $accountsWithOngoingSync, true)) {
@@ -144,8 +167,10 @@ readonly class AccountConnectionProcessor implements ProcessorInterface
             $syncs[] = $sync;
         }
 
-        $accountConnection
-            ->setExternalStatus(RequisitionStatus::tryFrom($requisition['status']));
+        // GoCardless keeps the requisition "LN" after the agreement expiry: rely on the accounts status instead
+        $accountConnection->setExternalStatus(
+            $expired ? RequisitionStatus::EXPIRED : RequisitionStatus::tryFrom($requisition['status'])
+        );
 
         // Flush before dispatching: the worker must find the synchronizations in database
         $this->entityManager->flush();
@@ -167,7 +192,20 @@ readonly class AccountConnectionProcessor implements ProcessorInterface
             throw new NotFoundHttpException("Account connection was not found");
         }
 
-        $this->goCardlessClient->deleteRequisition($accountConnection->getExternalId());
+        try {
+            $this->goCardlessClient->deleteRequisition($accountConnection->getExternalId());
+        } catch (\Throwable $exception) {
+            // An expired requisition may no longer be deletable: the local deletion must still happen
+            $this->logger->warning('GoCardless requisition deletion failed.', [
+                'account_connection_id' => $accountConnection->getId(),
+                'exception' => $exception,
+            ]);
+        }
+
+        // Accounts become orphans and keep their history: a new connection to the same bank re-attaches them
+        foreach ($accountConnection->getAccounts() as $account) {
+            $accountConnection->removeAccount($account);
+        }
 
         $accountConnection->setDeletedAt(new \DateTimeImmutable());
         $this->entityManager->flush();

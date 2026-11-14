@@ -3,13 +3,16 @@
 namespace App\MessageHandler;
 
 use App\Client\GoCardlessClient;
+use App\Client\GoCardlessAccessExpiredException;
 use App\Client\GoCardlessRateLimitException;
 use App\Entity\Account;
 use App\Entity\AccountSync;
 use App\Entity\Transaction;
+use App\Enum\AccountStatus;
 use App\Enum\AccountSyncError;
 use App\Enum\AccountSyncStatus;
 use App\Enum\Currency;
+use App\Enum\RequisitionStatus;
 use App\Message\AccountSyncRequest;
 use App\Repository\AccountSyncRepository;
 use App\Repository\TransactionRepository;
@@ -112,7 +115,13 @@ final class AccountSyncRequestHandler
 
             if ($sync !== null) {
                 $sync->fail($this->toError($exception));
-                $sync->getAccount()->setSynchronizedStatus(AccountSyncStatus::FAILED);
+                $failedAccount = $sync->getAccount()->setSynchronizedStatus(AccountSyncStatus::FAILED);
+
+                // GoCardless keeps the requisition "LN" after the agreement expiry: flag it so the client knows it must reconnect
+                if ($exception instanceof GoCardlessAccessExpiredException) {
+                    $failedAccount->getAccountConnection()?->setExternalStatus(RequisitionStatus::EXPIRED);
+                }
+
                 $em->flush();
             }
         }
@@ -122,6 +131,7 @@ final class AccountSyncRequestHandler
     {
         return match (true) {
             $exception instanceof GoCardlessRateLimitException => AccountSyncError::RATE_LIMITED,
+            $exception instanceof GoCardlessAccessExpiredException => AccountSyncError::ACCESS_EXPIRED,
             $exception instanceof HttpExceptionInterface
                 && in_array($exception->getResponse()->getStatusCode(), [401, 403], true) => AccountSyncError::ACCESS_EXPIRED,
             $exception instanceof \LogicException,

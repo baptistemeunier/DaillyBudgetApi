@@ -66,6 +66,12 @@ readonly class GoCardlessClient
             if ($exception->getResponse()->getStatusCode() !== 401) {
                 throw $this->convertException($exception);
             }
+
+            // Expired End User Agreement: a new token won't help, the bank must be reconnected.
+            $summary = $exception->getResponse()->toArray(false)['summary'] ?? '';
+            if (str_contains($summary, 'End User Agreement')) {
+                throw new GoCardlessAccessExpiredException($summary, $exception);
+            }
         }
 
         // Token expired or revoked: drop it from the cache and retry once with a fresh one.
