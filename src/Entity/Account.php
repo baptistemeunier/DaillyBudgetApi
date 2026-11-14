@@ -13,7 +13,9 @@ use App\Entity\Traits\TimestampableTrait;
 use App\Entity\Traits\UuidTrait;
 use App\Enum\AccountStatus;
 use App\Enum\AccountSyncStatus;
+use App\Enum\Currency;
 use App\Repository\AccountRepository;
+use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Bridge\Doctrine\Validator\Constraints\UniqueEntity;
 use Symfony\Component\Serializer\Attribute\Groups;
@@ -96,9 +98,64 @@ class Account
     #[Groups(['account:read'])]
     private ?\DateTimeImmutable $synchronizedAt = null;
 
+    /**
+     * Balance reported by the bank at the last sync (see balanceType for its kind).
+     */
+    #[ORM\Column(type: Types::DECIMAL, precision: 15, scale: 2, nullable: true)]
+    #[Groups(['account:read'])]
+    private ?string $balance = null;
+
+    #[ORM\Column(nullable: true, enumType: Currency::class)]
+    #[Groups(['account:read'])]
+    private ?Currency $balanceCurrency = null;
+
+    /**
+     * GoCardless balance type kept: closingBooked, interimBooked, expected, interimAvailable...
+     */
+    #[ORM\Column(length: 50, nullable: true)]
+    #[Groups(['account:read'])]
+    private ?string $balanceType = null;
+
+    /**
+     * Date the bank gives for the balance.
+     */
+    #[ORM\Column(nullable: true)]
+    #[Groups(['account:read'])]
+    private ?\DateTimeImmutable $balanceAt = null;
+
     public function __construct()
     {
         $this->id = Uuid::v7();
+    }
+
+    public function getBalance(): ?string
+    {
+        return $this->balance;
+    }
+
+    public function getBalanceCurrency(): ?Currency
+    {
+        return $this->balanceCurrency;
+    }
+
+    public function getBalanceType(): ?string
+    {
+        return $this->balanceType;
+    }
+
+    public function getBalanceAt(): ?\DateTimeImmutable
+    {
+        return $this->balanceAt;
+    }
+
+    public function setBalance(string $balance, Currency $currency, string $type, \DateTimeImmutable $at): static
+    {
+        $this->balance = $balance;
+        $this->balanceCurrency = $currency;
+        $this->balanceType = $type;
+        $this->balanceAt = $at;
+
+        return $this;
     }
 
     public function getSynchronizedAt(): ?\DateTimeImmutable

@@ -16,6 +16,7 @@ use App\Enum\RequisitionStatus;
 use App\Message\AccountSyncRequest;
 use App\Repository\AccountSyncRepository;
 use App\Repository\TransactionRepository;
+use App\Util\Money;
 use DateTimeImmutable;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\Persistence\ManagerRegistry;
@@ -28,6 +29,9 @@ final class AccountSyncRequestHandler
 {
     // GoCardless allows 4 transaction calls per account per 24h
     private const int MAX_SYNCS_PER_DAY = 4;
+
+    // Balance kept when the bank gives several: booked ones first, then the available ones
+    private const array BALANCE_TYPE_PRIORITY = ['closingBooked', 'interimBooked', 'expected', 'interimAvailable', 'forwardAvailable'];
 
     public function __construct(
         private readonly AccountSyncRepository $accountSyncRepository,
@@ -89,6 +93,7 @@ final class AccountSyncRequestHandler
 
         try {
             $this->syncTransactions($account);
+            $this->syncBalance($account);
 
             $sync->succeed();
             $account
@@ -148,6 +153,58 @@ final class AccountSyncRequestHandler
 
         $this->syncTransactionsType($account, $transactions['transactions']['booked'], true);
         #$this->syncTransactionsType($account, $transactions['transactions']['pending'], false);
+    }
+
+    /**
+     * Stores the balance reported by the bank. The balances endpoint has its own (tight) GoCardless quota:
+     * hitting it keeps the previous balance without failing the sync.
+     */
+    private function syncBalance(Account $account): void
+    {
+        try {
+            $balances = $this->goCardlessClient->getAccountBalances($account->getExternalId())['balances'] ?? [];
+        } catch (GoCardlessRateLimitException $exception) {
+            $this->logger->warning('Balance rate limited, previous balance kept.', [
+                'account_id' => $account->getId()?->toRfc4122(),
+                'exception' => $exception,
+            ]);
+
+            return;
+        }
+
+        if (!$balances) {
+            return;
+        }
+
+        usort($balances, static function (array $a, array $b): int {
+            $rank = static fn (array $balance) => array_search($balance['balanceType'] ?? null, self::BALANCE_TYPE_PRIORITY, true);
+            $rankA = $rank($a);
+            $rankB = $rank($b);
+
+            return ($rankA === false ? PHP_INT_MAX : $rankA) <=> ($rankB === false ? PHP_INT_MAX : $rankB);
+        });
+        $balance = $balances[0];
+
+        $amount = (string) ($balance['balanceAmount']['amount'] ?? '');
+        $currency = Currency::tryFrom($balance['balanceAmount']['currency'] ?? '');
+        if (!Money::isDecimal($amount) || null === $currency) {
+            // Unknown currency or format: better no balance than a wrong one
+            $this->logger->warning('Unsupported balance, not stored.', [
+                'account_id' => $account->getId()?->toRfc4122(),
+                'balance' => $balance,
+            ]);
+
+            return;
+        }
+
+        $date = $balance['referenceDate'] ?? $balance['lastChangeDateTime'] ?? null;
+
+        $account->setBalance(
+            Money::fromCents(Money::toCents($amount)),
+            $currency,
+            (string) ($balance['balanceType'] ?? 'unknown'),
+            $date ? new DateTimeImmutable($date) : new DateTimeImmutable(),
+        );
     }
 
     /**

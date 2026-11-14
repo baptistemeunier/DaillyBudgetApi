@@ -38,3 +38,10 @@ api_platform:
             category:write: 'Write Category'
             #budget:read: 'Read Budget'
             budget:write: 'Write Budget'
+
+    # Second way to authenticate in Swagger UI: paste an access token directly ("Authorize" > bearer)
+    swagger:
+        http_auth:
+            bearer:
+                scheme: bearer
+                bearerFormat: JWT
