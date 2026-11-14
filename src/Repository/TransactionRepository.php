@@ -20,6 +20,18 @@ class TransactionRepository extends ServiceEntityRepository
     }
 
     /**
+     * DQL condition: the sum of the splits differs from the amount (no split at all included).
+     */
+    public static function uncategorizedCondition(string $alias): string
+    {
+        return sprintf(
+            '%1$s.amount <> (SELECT COALESCE(SUM(uncategorized_split.amount), 0) FROM %2$s uncategorized_split WHERE uncategorized_split.transaction = %1$s)',
+            $alias,
+            TransactionSplit::class,
+        );
+    }
+
+    /**
      * Transactions of the user not fully categorized: the sum of their splits differs from their amount
      * (no split at all included).
      */
@@ -30,10 +42,7 @@ class TransactionRepository extends ServiceEntityRepository
             ->join('t.account', 'a')
             ->andWhere('a.owner = :owner')
             ->andWhere('a.deletedAt IS NULL')
-            ->andWhere(sprintf(
-                't.amount <> (SELECT COALESCE(SUM(s.amount), 0) FROM %s s WHERE s.transaction = t)',
-                TransactionSplit::class,
-            ))
+            ->andWhere(self::uncategorizedCondition('t'))
             ->setParameter('owner', $owner->getId(), UuidType::NAME)
             ->getQuery()
             ->getSingleScalarResult();

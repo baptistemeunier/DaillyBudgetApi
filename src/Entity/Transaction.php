@@ -7,6 +7,8 @@ use ApiPlatform\Metadata\Get;
 use ApiPlatform\Metadata\GetCollection;
 use ApiPlatform\Metadata\Link;
 use ApiPlatform\Metadata\Patch;
+use ApiPlatform\Metadata\QueryParameter;
+use App\Doctrine\Filter\UncategorizedFilter;
 use App\Entity\Traits\TimestampableTrait;
 use App\Entity\Traits\UuidTrait;
 use App\Enum\Currency;
@@ -41,6 +43,19 @@ use Symfony\Component\Validator\Constraints as Assert;
                 ),
             ],
             order: ['bookingAt' => 'DESC', 'id' => 'DESC'],
+        ),
+        // Every transaction of the user, all accounts together (scoped by CurrentUserExtension)
+        new GetCollection(
+            uriTemplate: '/transactions',
+            order: ['bookingAt' => 'DESC', 'id' => 'DESC'],
+            security: "is_granted('ACCOUNT_READ')",
+            parameters: [
+                'uncategorized' => new QueryParameter(
+                    filter: new UncategorizedFilter(),
+                    schema: ['type' => 'boolean'],
+                    description: 'true: only the transactions not fully categorized (sum of the splits ≠ amount)',
+                ),
+            ],
         ),
         new Patch(
             denormalizationContext: ['groups' => ['transaction:update']],
