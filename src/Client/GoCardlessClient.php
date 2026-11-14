@@ -146,6 +146,14 @@ readonly class GoCardlessClient
         );
     }
 
+    public function getAgreement(string $id): array
+    {
+        return $this->request(
+            'GET',
+            "/api/v2/agreements/enduser/{$id}/"
+        );
+    }
+
     public function getAccount(string $id): array
     {
         return $this->request(

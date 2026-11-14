@@ -74,6 +74,13 @@ class AccountConnection
     private ?RequisitionStatus $externalStatus = null;
 
     /**
+     * End of the bank access granted by the End User Agreement (accepted + access_valid_for_days).
+     */
+    #[ORM\Column(nullable: true)]
+    #[Groups(['account-connection:read'])]
+    private ?\DateTimeImmutable $accessExpiresAt = null;
+
+    /**
      * @var Collection<int, Account>
      */
     #[ORM\OneToMany(targetEntity: Account::class, mappedBy: 'accountConnection')]
@@ -108,6 +115,18 @@ class AccountConnection
     public function setExternalStatus(?RequisitionStatus $externalStatus): static
     {
         $this->externalStatus = $externalStatus;
+
+        return $this;
+    }
+
+    public function getAccessExpiresAt(): ?\DateTimeImmutable
+    {
+        return $this->accessExpiresAt;
+    }
+
+    public function setAccessExpiresAt(?\DateTimeImmutable $accessExpiresAt): static
+    {
+        $this->accessExpiresAt = $accessExpiresAt;
 
         return $this;
     }

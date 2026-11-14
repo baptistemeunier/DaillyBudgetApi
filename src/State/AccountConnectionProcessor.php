@@ -167,6 +167,12 @@ readonly class AccountConnectionProcessor implements ProcessorInterface
             $syncs[] = $sync;
         }
 
+        if ($requisition['status'] === RequisitionStatus::LINKED->value
+            && $accountConnection->getAccessExpiresAt() === null
+            && !empty($requisition['agreement'])) {
+            $accountConnection->setAccessExpiresAt($this->getAccessExpiresAt($requisition['agreement']));
+        }
+
         // GoCardless keeps the requisition "LN" after the agreement expiry: rely on the accounts status instead
         $accountConnection->setExternalStatus(
             $expired ? RequisitionStatus::EXPIRED : RequisitionStatus::tryFrom($requisition['status'])
@@ -180,6 +186,21 @@ readonly class AccountConnectionProcessor implements ProcessorInterface
         }
 
         return $accountConnection;
+    }
+
+    /**
+     * The access ends access_valid_for_days after the end user accepted the agreement.
+     */
+    private function getAccessExpiresAt(string $agreementId): ?\DateTimeImmutable
+    {
+        $agreement = $this->goCardlessClient->getAgreement($agreementId);
+
+        if (empty($agreement['accepted']) || empty($agreement['access_valid_for_days'])) {
+            return null;
+        }
+
+        return new \DateTimeImmutable($agreement['accepted'])
+            ->modify(sprintf('+%d days', (int) $agreement['access_valid_for_days']));
     }
 
     /**
