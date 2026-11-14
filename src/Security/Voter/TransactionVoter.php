@@ -4,22 +4,19 @@ namespace App\Security\Voter;
 
 use App\Entity\Transaction;
 use App\Enum\Role;
-use App\Repository\AccountRepository;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\Security\Core\Authentication\Token\TokenInterface;
 use Symfony\Component\Security\Core\Authorization\AccessDecision;
 use Symfony\Component\Security\Core\Authorization\Voter\Vote;
 use Symfony\Component\Security\Core\Authorization\Voter\Voter;
 use Symfony\Component\Security\Core\User\UserInterface;
-use Symfony\Component\Uid\Uuid;
 
 final class TransactionVoter extends Voter
 {
     public const READ = 'TRANSACTION_READ';
-    public const ACCOUNT_READ = 'TRANSACTION_ACCOUNT_READ';
     public const UPDATE = 'TRANSACTION_UPDATE';
 
-    public function __construct(private Security $security, private AccountRepository $accountRepository)
+    public function __construct(private Security $security)
     {
 
     }
@@ -28,10 +25,6 @@ final class TransactionVoter extends Voter
     {
         // Generic validation
         if(!$subject && in_array($attribute, [self::READ])) {
-            return true;
-        }
-
-        if(is_string($subject) && Uuid::isValid($subject) && in_array($attribute, [self::ACCOUNT_READ])) {
             return true;
         }
 
@@ -51,21 +44,6 @@ final class TransactionVoter extends Voter
 
         if(empty($subject)) {
             return $this->voteWithoutItem($attribute, $token, $vote);
-        }
-
-
-        if ($attribute === self::ACCOUNT_READ && is_string($subject) && Uuid::isValid($subject)) {
-            $account = $this->accountRepository->find($subject);
-            if(!$account) {
-                return false;
-            }
-
-            if(!$this->security->isGranted(AccountVoter::READ, $account)) {
-                $vote?->addReason('The user cannot read this account to this resource.');
-                return false;
-            }
-
-            return true;
         }
 
         if (!$subject instanceof Transaction) {

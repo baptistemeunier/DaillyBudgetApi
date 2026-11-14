@@ -11,12 +11,14 @@ use App\Client\GoCardlessClient;
 use App\Dto\CreateAccountConnection;
 use App\Entity\Account;
 use App\Entity\AccountConnection;
+use App\Entity\AccountSync;
 use App\Entity\User;
 use App\Enum\AccountStatus;
 use App\Enum\AccountSyncStatus;
 use App\Enum\RequisitionStatus;
 use App\Message\AccountSyncRequest;
 use App\Repository\AccountRepository;
+use App\Repository\AccountSyncRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
@@ -28,6 +30,7 @@ readonly class AccountConnectionProcessor implements ProcessorInterface
     public function __construct(
         private GoCardlessClient $goCardlessClient,
         private AccountRepository $accountRepository,
+        private AccountSyncRepository $accountSyncRepository,
         private EntityManagerInterface $entityManager,
         private Security $security,
         private MessageBusInterface $bus
@@ -104,7 +107,9 @@ readonly class AccountConnectionProcessor implements ProcessorInterface
         $accounts = $this->accountRepository->findBy([
             'accountConnection' => $accountConnection
         ]);
+        $accountsWithOngoingSync = $this->accountSyncRepository->findAccountsWithOngoingSync($accountConnection);
 
+        $syncs = [];
         foreach ($requisition['accounts'] as $accountId) {
             $account = array_find($accounts, function (Account $account) use ($accountId) {
                 return $account->getExternalId()->equals(Uuid::fromString($accountId));
@@ -128,16 +133,26 @@ readonly class AccountConnectionProcessor implements ProcessorInterface
                 ->setExternalUpdatedAt(new \DateTimeImmutable($externalAccount['last_accessed']))
                 ->setExternalStatus(AccountStatus::tryFrom($externalAccount['status']));
 
-            if($this->needAccountSync($account)) {
-                $account->setSynchronizedStatus(AccountSyncStatus::PENDING);
-                $this->bus->dispatch(new AccountSyncRequest($account->getId()));
+            // A synchronization is already queued or running: nothing to do
+            if(in_array($account, $accountsWithOngoingSync, true)) {
+                continue;
             }
+
+            $sync = new AccountSync($account);
+            $this->entityManager->persist($sync);
+            $account->setSynchronizedStatus(AccountSyncStatus::PENDING);
+            $syncs[] = $sync;
         }
 
         $accountConnection
             ->setExternalStatus(RequisitionStatus::tryFrom($requisition['status']));
 
+        // Flush before dispatching: the worker must find the synchronizations in database
         $this->entityManager->flush();
+
+        foreach ($syncs as $sync) {
+            $this->bus->dispatch(new AccountSyncRequest($sync->getId()));
+        }
 
         return $accountConnection;
     }
@@ -158,10 +173,5 @@ readonly class AccountConnectionProcessor implements ProcessorInterface
         $this->entityManager->flush();
 
         return null;
-    }
-
-    private function needAccountSync(mixed $account): bool
-    {
-        return true;
     }
 }

@@ -36,16 +36,17 @@ use Symfony\Component\Validator\Constraints as Assert;
                 'id' => new Link(
                     toProperty: 'account',
                     fromClass: Account::class,
+                    security: "is_granted('ACCOUNT_READ', account)",
+                    securityObjectName: 'account',
                 ),
             ],
-            security: "is_granted('TRANSACTION_ACCOUNT_READ', request.attributes.get('id'))",
             order: ['bookingAt' => 'DESC', 'id' => 'DESC'],
         ),
         new Patch(
-            security: "is_granted('TRANSACTION_UPDATE', object)",
-            // Checks the new splits: their categories must be visible to the user
-            securityPostDenormalize: "is_granted('TRANSACTION_UPDATE', object)",
             denormalizationContext: ['groups' => ['transaction:update']],
+            // Checks the new splits: their categories must be visible to the user
+            security: "is_granted('TRANSACTION_UPDATE', object)",
+            securityPostDenormalize: "is_granted('TRANSACTION_UPDATE', object)",
         ),
     ],
     normalizationContext: ['groups' => ['transaction:read', 'timestamp:read']],

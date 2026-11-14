@@ -6,16 +6,13 @@ use Symfony\Component\Messenger\Attribute\AsMessage;
 use Symfony\Component\Uid\Uuid;
 
 #[AsMessage('async')]
-final class AccountSyncRequest
+final readonly class AccountSyncRequest
 {
-    private Uuid $id;
-
     /**
-     * @param Uuid $id
+     * @param Uuid $id id of the AccountSync to run
      */
-    public function __construct(Uuid $id)
+    public function __construct(private Uuid $id)
     {
-        $this->id = $id;
     }
 
     public function getId(): Uuid

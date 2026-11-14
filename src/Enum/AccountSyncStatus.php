@@ -8,4 +8,5 @@ enum AccountSyncStatus: string
     case IN_PROGRESS = 'IN_PROGRESS';
     case FAILED = 'FAILED';
     case SUCCESS = 'SUCCESS';
+    case SKIPPED = 'SKIPPED';
 }

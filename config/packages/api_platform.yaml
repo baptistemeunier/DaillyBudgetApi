@@ -13,6 +13,9 @@ api_platform:
     enable_scalar: false
     defaults:
         stateless: true
+        # Clients can set the page size with ?itemsPerPage=
+        pagination_client_items_per_page: true
+        pagination_maximum_items_per_page: 100
         cache_headers:
             vary: [Content-Type, Authorization, Origin]
 

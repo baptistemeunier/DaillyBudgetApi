@@ -3,25 +3,31 @@
 namespace App\MessageHandler;
 
 use App\Client\GoCardlessClient;
+use App\Client\GoCardlessRateLimitException;
 use App\Entity\Account;
+use App\Entity\AccountSync;
 use App\Entity\Transaction;
+use App\Enum\AccountSyncError;
 use App\Enum\AccountSyncStatus;
 use App\Enum\Currency;
 use App\Message\AccountSyncRequest;
-use App\Repository\AccountRepository;
+use App\Repository\AccountSyncRepository;
 use App\Repository\TransactionRepository;
 use DateTimeImmutable;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\Persistence\ManagerRegistry;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
-use Symfony\Component\Messenger\MessageBusInterface;
+use Symfony\Contracts\HttpClient\Exception\HttpExceptionInterface;
 
 #[AsMessageHandler]
 final class AccountSyncRequestHandler
 {
+    // GoCardless allows 4 transaction calls per account per 24h
+    private const int MAX_SYNCS_PER_DAY = 4;
+
     public function __construct(
-        private readonly AccountRepository $accountRepository,
+        private readonly AccountSyncRepository $accountSyncRepository,
         private readonly TransactionRepository $transactionRepository,
         private readonly LoggerInterface $logger,
         private readonly EntityManagerInterface $entityManager,
@@ -32,50 +38,97 @@ final class AccountSyncRequestHandler
 
     public function __invoke(AccountSyncRequest $message): void
     {
-        $accountId = $message->getId();
+        $syncId = $message->getId();
+        $sync = $this->accountSyncRepository->find($syncId);
+        $account = $sync?->getAccount();
 
-        $this->logger->info('Starting account synchronization.', [
-            'account_id' => $accountId,
-        ]);
+        if (!$sync || !$account || $account->getDeletedAt() !== null) {
+            $this->logger->warning('Account synchronization skipped: synchronization or account not found or deleted.', [
+                'account_sync_id' => $syncId,
+            ]);
 
-        $account = $this->accountRepository->find($accountId);
+            return;
+        }
 
-        if (!$account || $account->getDeletedAt() !== null) {
-            $this->logger->warning('Account synchronization skipped: account not found or deleted.', [
+        $accountId = $account->getId();
+
+        if ($sync->getStatus() !== AccountSyncStatus::PENDING) {
+            $this->logger->warning('Account synchronization skipped: synchronization already processed.', [
+                'account_sync_id' => $syncId,
+                'status' => $sync->getStatus()->value,
+            ]);
+
+            return;
+        }
+
+        if ($this->accountSyncRepository->countStartedSince($account, new DateTimeImmutable('-24 hours')) >= self::MAX_SYNCS_PER_DAY) {
+            // The account keeps the status of its last real synchronization
+            $sync->skip(AccountSyncError::DAILY_LIMIT_REACHED);
+            $account->setSynchronizedStatus($this->accountSyncRepository->findLastRunStatus($account) ?? AccountSyncStatus::SKIPPED);
+            $this->entityManager->flush();
+
+            $this->logger->info('Account synchronization skipped: daily limit reached.', [
+                'account_sync_id' => $syncId,
                 'account_id' => $accountId,
             ]);
 
             return;
         }
 
+        $this->logger->info('Starting account synchronization.', [
+            'account_sync_id' => $syncId,
+            'account_id' => $accountId,
+        ]);
+
+        $sync->start();
+        $account->setSynchronizedStatus(AccountSyncStatus::IN_PROGRESS);
+        $this->entityManager->flush();
+
         try {
             $this->syncTransactions($account);
 
+            $sync->succeed();
             $account
                 ->setSynchronizedStatus(AccountSyncStatus::SUCCESS)
-                ->setSynchronizedAt(new DateTimeImmutable());
+                ->setSynchronizedAt($sync->getFinishedAt());
 
             $this->entityManager->flush();
 
             $this->logger->info('Account synchronization completed successfully.', [
+                'account_sync_id' => $syncId,
                 'account_id' => $accountId,
             ]);
 
         } catch (\Throwable $exception) {
             $this->logger->error('Account synchronization failed.', [
+                'account_sync_id' => $syncId,
                 'account_id' => $accountId,
                 'exception' => $exception,
             ]);
 
-            dump($exception);
+            // The entity manager may be closed or hold half-synced transactions: start from a clean one
             $em = $this->doctrine->resetManager();
-            $account = $em->getRepository(Account::class)->find($accountId);
+            $sync = $em->getRepository(AccountSync::class)->find($syncId);
 
-            if ($account !== null) {
-                $account->setSynchronizedStatus(AccountSyncStatus::FAILED);
+            if ($sync !== null) {
+                $sync->fail($this->toError($exception));
+                $sync->getAccount()->setSynchronizedStatus(AccountSyncStatus::FAILED);
                 $em->flush();
             }
         }
+    }
+
+    private function toError(\Throwable $exception): AccountSyncError
+    {
+        return match (true) {
+            $exception instanceof GoCardlessRateLimitException => AccountSyncError::RATE_LIMITED,
+            $exception instanceof HttpExceptionInterface
+                && in_array($exception->getResponse()->getStatusCode(), [401, 403], true) => AccountSyncError::ACCESS_EXPIRED,
+            $exception instanceof \LogicException,
+            $exception instanceof \ValueError,
+            $exception instanceof \DateMalformedStringException => AccountSyncError::INVALID_DATA,
+            default => AccountSyncError::UNKNOWN,
+        };
     }
 
     private function syncTransactions(Account $account)
