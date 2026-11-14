@@ -94,13 +94,6 @@ final class TransactionVoter extends Voter
                     return false;
                 }
 
-                // Manual accounts only hold their initial transaction and the mirrors of the transfers
-                if($subject->getAccount()->isManual()) {
-                    $vote?->addReason('The transactions of a manual account cannot be changed.');
-
-                    return false;
-                }
-
                 // After denormalization: the new splits can only use categories and accounts visible to the user
                 foreach ($subject->getSplits() as $split) {
                     if($split->getCategory() && !$this->security->isGranted(CategoryVoter::READ, $split->getCategory())) {

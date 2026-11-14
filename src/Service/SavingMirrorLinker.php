@@ -46,6 +46,14 @@ final readonly class SavingMirrorLinker
             }
 
             $account = $split->getCounterpartAccount();
+
+            // Mirror being recategorized: keep its link back to the origin transaction
+            if (!$account && $back = $this->takeBackLink($pool, $split->getCategory())) {
+                $split->setCounterpartTransaction($back);
+
+                continue;
+            }
+
             // No account given: the client does not send it back, keep the previous mirror of this category
             $old = $this->takeFromPool($pool, $split->getCategory(), $account);
             $account ??= $old?->getCounterpartTransaction()->getAccount();
@@ -87,6 +95,26 @@ final readonly class SavingMirrorLinker
                 unset($pool[$key]);
 
                 return $old;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * On a mirror: removes from the pool and returns the origin transaction of the previous split with this category
+     * (its counterpart is on a synced account).
+     *
+     * @param TransactionSplit[] $pool
+     */
+    private function takeBackLink(array &$pool, ?Category $category): ?Transaction
+    {
+        foreach ($pool as $key => $old) {
+            $origin = $old->getCounterpartTransaction();
+            if ($origin && !$origin->getAccount()->isManual() && $old->getCategory() === $category) {
+                unset($pool[$key]);
+
+                return $origin;
             }
         }
 
