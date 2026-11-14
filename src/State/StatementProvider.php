@@ -4,7 +4,6 @@ namespace App\State;
 
 use ApiPlatform\Metadata\Operation;
 use ApiPlatform\State\ProviderInterface;
-use ApiPlatform\Validator\Exception\ValidationException;
 use App\ApiResource\Statement;
 use App\ApiResource\StatementDetail;
 use App\ApiResource\StatementLine;
@@ -17,11 +16,10 @@ use App\Repository\CategoryRepository;
 use App\Repository\TransactionRepository;
 use App\Security\Voter\BudgetVoter;
 use App\Util\Money;
+use App\Util\Period;
 use Symfony\Bundle\SecurityBundle\Security;
-use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\Uid\Uuid;
 use Symfony\Component\Validator\ConstraintViolation;
-use Symfony\Component\Validator\ConstraintViolationList;
 
 /**
  * Builds the statement of the current user over a period of whole months, compared to their budget.
@@ -45,23 +43,8 @@ final readonly class StatementProvider implements ProviderInterface
             throw new \LogicException('User not found');
         }
 
-        $period = (string) ($uriVariables['period'] ?? '');
-        if (1 !== preg_match('/^' . Statement::PERIOD_PATTERN . '$/', $period)) {
-            throw new NotFoundHttpException('Invalid period.'); // already rejected by the route requirements
-        }
-
-        [$from, $to] = explode('..', $period . '..' . $period); // a single month is from = to
-        if ($to < $from) { // YYYY-MM strings compare chronologically
-            $message = 'The last month cannot be before the first one.';
-            throw new ValidationException(new ConstraintViolationList([
-                new ConstraintViolation($message, $message, [], null, 'period', $period),
-            ]));
-        }
-
-        $start = new \DateTimeImmutable($from . '-01 00:00:00');
-        $end = new \DateTimeImmutable($to . '-01 00:00:00')->modify('first day of next month');
-        $months = ((int) substr($to, 0, 4) - (int) substr($from, 0, 4)) * 12
-            + (int) substr($to, 5, 2) - (int) substr($from, 5, 2) + 1;
+        $period = Period::fromString((string) ($uriVariables['period'] ?? ''));
+        [$from, $to, $start, $end, $months] = [$period->from, $period->to, $period->start, $period->end, $period->months];
 
         $budget = $this->findBudget($user);
         $currency = $budget?->getCurrency() ?? Currency::EUR;

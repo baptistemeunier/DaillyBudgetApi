@@ -48,8 +48,16 @@ final class ValidTransactionSplitsValidator extends ConstraintValidator
             }
             $total += $cents;
 
-            // Credits take income / transfer categories, debits expense / transfer ones
+            // Only sub-categories: a root only groups them
             $splitCategory = $split->getCategory();
+            if ($splitCategory && null === $splitCategory->getParent()) {
+                $this->context->buildViolation($constraint->rootCategoryMessage)
+                    ->setParameter('{{ category }}', $splitCategory->getName() ?? $splitCategory->getCode() ?? '?')
+                    ->atPath('splits')
+                    ->addViolation();
+            }
+
+            // Credits take income / transfer categories, debits expense / transfer ones
             if ($splitCategory && !$splitCategory->getType()->allowsAmountSign($amount)) {
                 $this->context->buildViolation($constraint->categoryTypeMessage)
                     ->setParameter('{{ category }}', $splitCategory->getName() ?? $splitCategory->getCode() ?? '?')

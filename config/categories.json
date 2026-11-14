@@ -3,260 +3,330 @@
     "categories": [
         {
             "id": "housing",
+            "icon": "house",
             "type": "expense",
             "subcategories": [
                 {
-                    "id": "housing.rent_mortgage"
+                    "id": "housing.rent_mortgage",
+                    "icon": "key-round"
                 },
                 {
-                    "id": "housing.charges"
+                    "id": "housing.charges",
+                    "icon": "building"
                 },
                 {
-                    "id": "housing.utilities"
+                    "id": "housing.utilities",
+                    "icon": "zap"
                 },
                 {
-                    "id": "housing.insurance"
+                    "id": "housing.insurance",
+                    "icon": "shield"
                 },
                 {
-                    "id": "housing.home_works"
+                    "id": "housing.home_works",
+                    "icon": "hammer"
                 }
             ]
         },
         {
             "id": "food",
+            "icon": "shopping-cart",
             "type": "expense",
             "subcategories": [
                 {
-                    "id": "food.groceries"
+                    "id": "food.groceries",
+                    "icon": "shopping-basket"
                 },
                 {
-                    "id": "food.restaurants_bars"
+                    "id": "food.restaurants_bars",
+                    "icon": "utensils"
                 },
                 {
-                    "id": "food.fastfood_delivery"
+                    "id": "food.fastfood_delivery",
+                    "icon": "pizza"
                 },
                 {
-                    "id": "food.canteen_snacks"
+                    "id": "food.canteen_snacks",
+                    "icon": "sandwich"
                 }
             ]
         },
         {
             "id": "transport",
+            "icon": "car",
             "type": "expense",
             "subcategories": [
                 {
-                    "id": "transport.fuel"
+                    "id": "transport.fuel",
+                    "icon": "fuel"
                 },
                 {
-                    "id": "transport.maintenance"
+                    "id": "transport.maintenance",
+                    "icon": "wrench"
                 },
                 {
-                    "id": "transport.insurance"
+                    "id": "transport.insurance",
+                    "icon": "shield-check"
                 },
                 {
-                    "id": "transport.tolls_parking"
+                    "id": "transport.tolls_parking",
+                    "icon": "square-parking"
                 },
                 {
-                    "id": "transport.public"
+                    "id": "transport.public",
+                    "icon": "bus"
                 },
                 {
-                    "id": "transport.taxi"
+                    "id": "transport.taxi",
+                    "icon": "car-taxi-front"
                 },
                 {
-                    "id": "transport.vehicle"
+                    "id": "transport.vehicle",
+                    "icon": "car-front"
                 }
             ]
         },
         {
             "id": "subscriptions",
+            "icon": "repeat",
             "type": "expense",
             "subcategories": [
                 {
-                    "id": "subscriptions.mobile"
+                    "id": "subscriptions.mobile",
+                    "icon": "smartphone"
                 },
                 {
-                    "id": "subscriptions.internet"
+                    "id": "subscriptions.internet",
+                    "icon": "wifi"
                 },
                 {
-                    "id": "subscriptions.streaming"
+                    "id": "subscriptions.streaming",
+                    "icon": "tv"
                 },
                 {
-                    "id": "subscriptions.software_press"
+                    "id": "subscriptions.software_press",
+                    "icon": "newspaper"
                 }
             ]
         },
         {
             "id": "shopping",
+            "icon": "shopping-bag",
             "type": "expense",
             "subcategories": [
                 {
-                    "id": "shopping.clothing"
+                    "id": "shopping.clothing",
+                    "icon": "shirt"
                 },
                 {
-                    "id": "shopping.electronics"
+                    "id": "shopping.electronics",
+                    "icon": "laptop"
                 },
                 {
-                    "id": "shopping.beauty"
+                    "id": "shopping.beauty",
+                    "icon": "sparkles"
                 },
                 {
-                    "id": "shopping.other"
+                    "id": "shopping.other",
+                    "icon": "package"
                 }
             ]
         },
         {
             "id": "health",
+            "icon": "heart-pulse",
             "type": "expense",
             "subcategories": [
                 {
-                    "id": "health.doctors"
+                    "id": "health.doctors",
+                    "icon": "stethoscope"
                 },
                 {
-                    "id": "health.pharmacy"
+                    "id": "health.pharmacy",
+                    "icon": "pill"
                 },
                 {
-                    "id": "health.dental_optical"
+                    "id": "health.dental_optical",
+                    "icon": "glasses"
                 },
                 {
-                    "id": "health.paramedical"
+                    "id": "health.paramedical",
+                    "icon": "activity"
                 },
                 {
-                    "id": "health.insurance"
+                    "id": "health.insurance",
+                    "icon": "shield-plus"
                 }
             ]
         },
         {
             "id": "leisure",
+            "icon": "ticket",
             "type": "expense",
             "subcategories": [
                 {
-                    "id": "leisure.outings_culture"
+                    "id": "leisure.outings_culture",
+                    "icon": "drama"
                 },
                 {
-                    "id": "leisure.sport"
+                    "id": "leisure.sport",
+                    "icon": "dumbbell"
                 },
                 {
-                    "id": "leisure.hobbies"
+                    "id": "leisure.hobbies",
+                    "icon": "palette"
                 }
             ]
         },
         {
             "id": "travel",
+            "icon": "plane",
             "type": "expense",
             "subcategories": [
                 {
-                    "id": "travel.transport"
+                    "id": "travel.transport",
+                    "icon": "train-front"
                 },
                 {
-                    "id": "travel.accommodation"
+                    "id": "travel.accommodation",
+                    "icon": "hotel"
                 },
                 {
-                    "id": "travel.activities"
+                    "id": "travel.activities",
+                    "icon": "map"
                 }
             ]
         },
         {
             "id": "kids",
+            "icon": "baby",
             "type": "expense",
             "subcategories": [
                 {
-                    "id": "kids.childcare"
+                    "id": "kids.childcare",
+                    "icon": "blocks"
                 },
                 {
-                    "id": "kids.school"
+                    "id": "kids.school",
+                    "icon": "school"
                 },
                 {
-                    "id": "kids.activities"
+                    "id": "kids.activities",
+                    "icon": "bike"
                 },
                 {
-                    "id": "kids.supplies_allowance"
+                    "id": "kids.supplies_allowance",
+                    "icon": "backpack"
                 }
             ]
         },
         {
             "id": "pets",
+            "icon": "paw-print",
             "type": "expense",
             "optional": true,
             "subcategories": [
                 {
-                    "id": "pets.food_supplies"
+                    "id": "pets.food_supplies",
+                    "icon": "bone"
                 },
                 {
-                    "id": "pets.vet"
+                    "id": "pets.vet",
+                    "icon": "syringe"
                 }
             ]
         },
         {
             "id": "taxes_bank",
+            "icon": "landmark",
             "type": "expense",
             "subcategories": [
                 {
-                    "id": "taxes_bank.income_tax"
+                    "id": "taxes_bank.income_tax",
+                    "icon": "receipt"
                 },
                 {
-                    "id": "taxes_bank.property_tax"
+                    "id": "taxes_bank.property_tax",
+                    "icon": "house-plus"
                 },
                 {
-                    "id": "taxes_bank.bank_fees"
+                    "id": "taxes_bank.bank_fees",
+                    "icon": "credit-card"
                 },
                 {
-                    "id": "taxes_bank.loans"
+                    "id": "taxes_bank.loans",
+                    "icon": "hand-coins"
                 }
             ]
         },
         {
             "id": "gifts",
+            "icon": "gift",
             "type": "expense",
             "subcategories": [
                 {
-                    "id": "gifts.gifts"
+                    "id": "gifts.gifts",
+                    "icon": "gift"
                 },
                 {
-                    "id": "gifts.donations"
+                    "id": "gifts.donations",
+                    "icon": "heart-handshake"
                 }
             ]
         },
         {
             "id": "misc",
+            "icon": "circle-help",
             "type": "expense",
             "subcategories": [
                 {
-                    "id": "misc.cash"
+                    "id": "misc.cash",
+                    "icon": "banknote"
                 },
                 {
-                    "id": "misc.uncategorized"
+                    "id": "misc.uncategorized",
+                    "icon": "circle-dashed"
                 }
             ]
         },
         {
             "id": "income",
+            "icon": "wallet",
             "type": "income",
             "subcategories": [
                 {
-                    "id": "income.salary"
+                    "id": "income.salary",
+                    "icon": "briefcase"
                 },
                 {
-                    "id": "income.benefits"
+                    "id": "income.benefits",
+                    "icon": "hand-heart"
                 },
                 {
-                    "id": "income.refunds"
+                    "id": "income.refunds",
+                    "icon": "undo-2"
                 },
                 {
-                    "id": "income.other"
+                    "id": "income.other",
+                    "icon": "circle-plus"
                 }
             ]
         },
         {
             "id": "internal",
+            "icon": "arrow-left-right",
             "type": "transfer",
             "excludeFromStats": true,
             "subcategories": [
                 {
-                    "id": "internal.transfers"
+                    "id": "internal.transfers",
+                    "icon": "arrow-right-left"
                 }
             ]
         },
         {
             "id": "saving",
+            "icon": "piggy-bank",
             "type": "saving",
             "excludeFromStats": true,
             "subcategories": []

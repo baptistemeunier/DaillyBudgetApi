@@ -3,6 +3,7 @@
 namespace App\Entity;
 
 use ApiPlatform\Doctrine\Orm\Filter\DateFilter;
+use ApiPlatform\Doctrine\Orm\Filter\ExactFilter;
 use ApiPlatform\Metadata\ApiResource;
 use ApiPlatform\Metadata\Get;
 use ApiPlatform\Metadata\GetCollection;
@@ -69,6 +70,11 @@ use Symfony\Component\Validator\Constraints as Assert;
                     filter: new DateFilter(),
                     property: 'bookingAt',
                     description: 'Booking date bounds: bookingAt[after|before|strictly_after|strictly_before]=<date>',
+                ),
+                // ?accountType[]=checking or ?accountType[]=savings&accountType[]=investment
+                'accountType' => new QueryParameter(
+                    filter: new ExactFilter(),
+                    property: 'account.type',
                 ),
             ],
         ),

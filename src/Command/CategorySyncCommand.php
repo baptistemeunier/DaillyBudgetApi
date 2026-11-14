@@ -46,7 +46,7 @@ final readonly class CategorySyncCommand
         $created = 0;
         $seen = [];
 
-        $upsert = function (string $code, ?Category $parent) use (&$existing, &$created, &$seen): Category {
+        $upsert = function (string $code, ?string $icon, ?Category $parent) use (&$existing, &$created, &$seen): Category {
             if (isset($seen[$code])) {
                 throw new \LogicException(sprintf('Duplicate category code "%s" in catalog.', $code));
             }
@@ -62,6 +62,7 @@ final readonly class CategorySyncCommand
 
             return $category
                 ->setName(null)
+                ->setIcon($icon)
                 ->setOwner(null)
                 ->setParent($parent)
                 ->setDeletedAt(null);
@@ -69,10 +70,10 @@ final readonly class CategorySyncCommand
 
         foreach ($catalog['categories'] as $item) {
             // Roots carry the type; sub-categories inherit it in setParent()
-            $category = $upsert($item['id'], null)->setType(CategoryType::from($item['type']));
+            $category = $upsert($item['id'], $item['icon'] ?? null, null)->setType(CategoryType::from($item['type']));
 
             foreach ($item['subcategories'] ?? [] as $subItem) {
-                $upsert($subItem['id'], $category);
+                $upsert($subItem['id'], $subItem['icon'] ?? null, $category);
             }
         }
 

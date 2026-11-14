@@ -83,11 +83,12 @@ class TransactionRepository extends ServiceEntityRepository
     }
 
     /**
-     * Sum of the categorized splits per category (no grouping on the root), over the period.
+     * Sum of the categorized splits per category (no grouping on the root), over the period
+     * (no $start: from the beginning), on the accounts of the given type.
      *
      * @return list<array{category: Uuid, type: CategoryType, amount: string, count: int}> amounts are signed (debits negative)
      */
-    public function sumSplitsByCategory(User $owner, Currency $currency, \DateTimeImmutable $start, \DateTimeImmutable $end): array
+    public function sumSplitsByCategory(User $owner, Currency $currency, ?\DateTimeImmutable $start, \DateTimeImmutable $end, AccountType $accountType = AccountType::CHECKING): array
     {
         $qb = $this->getEntityManager()->createQueryBuilder()
             ->select('IDENTITY(s.category) AS category', 'c.type AS type', 'SUM(s.amount) AS amount', 'COUNT(DISTINCT t.id) AS count')
@@ -97,7 +98,7 @@ class TransactionRepository extends ServiceEntityRepository
             ->groupBy('s.category')
             ->addGroupBy('c.type');
 
-        $rows = $this->filterPeriod($qb, $owner, $currency, $start, $end)->getQuery()->getScalarResult();
+        $rows = $this->filterPeriod($qb, $owner, $currency, $start, $end, $accountType)->getQuery()->getScalarResult();
 
         return array_map(static fn (array $row) => [
             // Raw value (binary on MySQL): not converted by Doctrine
@@ -172,24 +173,52 @@ class TransactionRepository extends ServiceEntityRepository
     }
 
     /**
-     * Transactions (alias "t") of the user's active checking accounts, in the currency, booked in [start, end[.
-     * Savings and investment accounts stay out of the budget.
+     * Transactions of the user's savings accounts over the period, with the categorized part of each one
+     * (sum of its splits), for the savings dashboard. Closed accounts are left out.
+     *
+     * @return list<array{bookingAt: \DateTimeImmutable, amount: string, categorized: string}>
      */
-    private function filterPeriod(QueryBuilder $qb, User $owner, Currency $currency, \DateTimeImmutable $start, \DateTimeImmutable $end): QueryBuilder
+    public function findSavingsMovements(User $owner, Currency $currency, \DateTimeImmutable $start, \DateTimeImmutable $end): array
     {
-        return $qb
+        $qb = $this->createQueryBuilder('t')
+            ->select('t.bookingAt AS bookingAt', 't.amount AS amount')
+            ->addSelect(sprintf(
+                '(SELECT COALESCE(SUM(movement_split.amount), 0) FROM %s movement_split WHERE movement_split.transaction = t) AS categorized',
+                TransactionSplit::class,
+            ));
+
+        return array_map(static fn (array $row) => [
+            'bookingAt' => $row['bookingAt'],
+            'amount' => (string) $row['amount'],
+            'categorized' => (string) $row['categorized'],
+        ], $this->filterPeriod($qb, $owner, $currency, $start, $end, AccountType::SAVINGS)->getQuery()->getResult());
+    }
+
+    /**
+     * Transactions (alias "t") of the user's active accounts of the given type (checking by default: savings
+     * and investment accounts stay out of the budget), in the currency, booked in [start, end[ (no start: since the beginning).
+     */
+    private function filterPeriod(QueryBuilder $qb, User $owner, Currency $currency, ?\DateTimeImmutable $start, \DateTimeImmutable $end, AccountType $accountType = AccountType::CHECKING): QueryBuilder
+    {
+        $qb
             ->join('t.account', 'period_account')
             ->andWhere('period_account.owner = :period_owner')
             ->andWhere('period_account.deletedAt IS NULL')
             ->andWhere('period_account.type = :period_account_type')
             ->andWhere('t.currency = :period_currency')
-            ->andWhere('t.bookingAt >= :period_start')
             ->andWhere('t.bookingAt < :period_end')
             ->setParameter('period_owner', $owner->getId(), UuidType::NAME)
-            ->setParameter('period_account_type', AccountType::CHECKING)
+            ->setParameter('period_account_type', $accountType)
             ->setParameter('period_currency', $currency)
-            ->setParameter('period_start', $start)
             ->setParameter('period_end', $end);
+
+        if (null !== $start) {
+            $qb
+                ->andWhere('t.bookingAt >= :period_start')
+                ->setParameter('period_start', $start);
+        }
+
+        return $qb;
     }
 
 //    /**

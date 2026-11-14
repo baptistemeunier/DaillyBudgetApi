@@ -8,6 +8,7 @@ use ApiPlatform\Metadata\Get;
 use App\Entity\Budget;
 use App\Enum\Currency;
 use App\State\StatementProvider;
+use App\Util\Period;
 use Symfony\Component\Serializer\Attribute\Groups;
 
 /**
@@ -29,8 +30,7 @@ use Symfony\Component\Serializer\Attribute\Groups;
 )]
 final class Statement
 {
-    public const string MONTH_PATTERN = '\d{4}-(?:0[1-9]|1[0-2])';
-    public const string PERIOD_PATTERN = self::MONTH_PATTERN . '(?:\.\.' . self::MONTH_PATTERN . ')?';
+    public const string PERIOD_PATTERN = Period::PATTERN;
 
     #[ApiProperty(identifier: true, example: '2026-10..2026-11')]
     #[Groups(['statement:read'])]

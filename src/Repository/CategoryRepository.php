@@ -39,6 +39,26 @@ class CategoryRepository extends ServiceEntityRepository
             ->getResult();
     }
 
+    /**
+     * Saving sub-categories (envelopes) visible to the user, active, by name. The root only groups them.
+     *
+     * @return Category[]
+     */
+    public function findActiveSavingCategories(User $owner): array
+    {
+        return $this->createQueryBuilder('c')
+            ->andWhere('c.deletedAt IS NULL')
+            ->andWhere('c.parent IS NOT NULL')
+            ->andWhere('c.type = :type')
+            ->andWhere('(c.owner IS NULL OR IDENTITY(c.owner) = :owner)')
+            ->setParameter('type', CategoryType::SAVING)
+            ->setParameter('owner', $owner->getId(), UuidType::NAME)
+            ->orderBy('c.name', 'ASC')
+            ->addOrderBy('c.code', 'ASC')
+            ->getQuery()
+            ->getResult();
+    }
+
 //    /**
 //     * @return Category[] Returns an array of Category objects
 //     */

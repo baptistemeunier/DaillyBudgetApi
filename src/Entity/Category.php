@@ -16,8 +16,10 @@ use App\Entity\Traits\UuidTrait;
 use App\Enum\CategoryType;
 use App\Repository\CategoryRepository;
 use App\State\CategoryProcessor;
+use App\Validator\ValidCategoryTarget;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
+use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Bridge\Doctrine\Validator\Constraints\UniqueEntity;
 use Symfony\Component\Serializer\Attribute\Groups;
@@ -47,6 +49,7 @@ use Symfony\Component\Validator\Constraints as Assert;
     ],
     normalizationContext: ['groups' => ['category:read', 'timestamp:read']],
 )]
+#[ValidCategoryTarget]
 class Category
 {
     use UuidTrait;
@@ -62,6 +65,16 @@ class Category
     #[ORM\Column(length: 100, nullable: true)]
     #[Groups(['category:read', 'category:create'])]
     private ?string $name = null;
+
+    /**
+     * Lucide icon name (https://lucide.dev/icons), e.g. "piggy-bank". Set by the catalog sync for system categories.
+     */
+    #[ORM\Column(length: 50, nullable: true)]
+    #[Groups(['category:read', 'category:create'])]
+    #[Assert\Length(max: 50)]
+    #[Assert\Regex('/^[a-z0-9]+(-[a-z0-9]+)*$/', message: 'The icon must be a Lucide icon name (lowercase, dash-separated).')]
+    #[ApiProperty(example: 'piggy-bank')]
+    private ?string $icon = null;
 
     /**
      * Set by the catalog sync for system roots; inherited from the parent otherwise (see setParent()).
@@ -90,6 +103,20 @@ class Category
     #[ORM\ManyToOne]
     private ?User $owner = null;
 
+    /**
+     * Saving category (envelope) only: amount to reach, optionally by targetDate.
+     */
+    #[ORM\Column(type: Types::DECIMAL, precision: 15, scale: 2, nullable: true)]
+    #[Groups(['category:read', 'category:create'])]
+    #[Assert\Regex('/^\d{1,13}(\.\d{1,2})?$/', message: 'The amount must be a positive decimal with at most 2 digits.')]
+    #[ApiProperty(example: '3500.00')]
+    private ?string $targetAmount = null;
+
+    #[ORM\Column(type: Types::DATE_IMMUTABLE, nullable: true)]
+    #[Groups(['category:read', 'category:create'])]
+    #[ApiProperty(example: '2027-12-01')]
+    private ?\DateTimeImmutable $targetDate = null;
+
     public function __construct()
     {
         $this->id = Uuid::v7();
@@ -116,6 +143,18 @@ class Category
     public function setName(?string $name): static
     {
         $this->name = $name;
+
+        return $this;
+    }
+
+    public function getIcon(): ?string
+    {
+        return $this->icon;
+    }
+
+    public function setIcon(?string $icon): static
+    {
+        $this->icon = $icon;
 
         return $this;
     }
@@ -175,6 +214,30 @@ class Category
                 $child->setParent(null);
             }
         }
+
+        return $this;
+    }
+
+    public function getTargetAmount(): ?string
+    {
+        return $this->targetAmount;
+    }
+
+    public function setTargetAmount(?string $targetAmount): static
+    {
+        $this->targetAmount = $targetAmount;
+
+        return $this;
+    }
+
+    public function getTargetDate(): ?\DateTimeImmutable
+    {
+        return $this->targetDate;
+    }
+
+    public function setTargetDate(?\DateTimeImmutable $targetDate): static
+    {
+        $this->targetDate = $targetDate;
 
         return $this;
     }
