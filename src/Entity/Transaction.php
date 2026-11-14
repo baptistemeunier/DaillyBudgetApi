@@ -2,7 +2,6 @@
 
 namespace App\Entity;
 
-use ApiPlatform\Metadata\ApiProperty;
 use ApiPlatform\Metadata\ApiResource;
 use ApiPlatform\Metadata\Get;
 use ApiPlatform\Metadata\GetCollection;
@@ -12,15 +11,20 @@ use App\Entity\Traits\TimestampableTrait;
 use App\Entity\Traits\UuidTrait;
 use App\Enum\Currency;
 use App\Repository\TransactionRepository;
+use App\Validator\ValidTransactionSplits;
+use Doctrine\Common\Collections\ArrayCollection;
+use Doctrine\Common\Collections\Collection;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Bridge\Doctrine\Validator\Constraints\UniqueEntity;
 use Symfony\Component\Serializer\Attribute\Groups;
 use Symfony\Component\Uid\Uuid;
+use Symfony\Component\Validator\Constraints as Assert;
 
 #[ORM\Entity(repositoryClass: TransactionRepository::class)]
 #[ORM\UniqueConstraint(name: 'UNIQ_EXTERNAL_ID', columns: ['account_id', 'external_id'])]
 #[ORM\HasLifecycleCallbacks]
+#[ValidTransactionSplits]
 #[ApiResource(
     operations: [
         new Get(
@@ -39,8 +43,8 @@ use Symfony\Component\Uid\Uuid;
         ),
         new Patch(
             security: "is_granted('TRANSACTION_UPDATE', object)",
-            // The new category must be visible to the user (system category or one of theirs)
-            securityPostDenormalize: "object.getCategory() === null or is_granted('CATEGORY_READ', object.getCategory())",
+            // Checks the new splits: their categories must be visible to the user
+            securityPostDenormalize: "is_granted('TRANSACTION_UPDATE', object)",
             denormalizationContext: ['groups' => ['transaction:update']],
         ),
     ],
@@ -102,15 +106,20 @@ class Transaction
     #[ORM\JoinColumn(nullable: false)]
     private ?Account $account = null;
 
-    #[ORM\ManyToOne]
-    #[ORM\JoinColumn(onDelete: 'SET NULL')]
+    /**
+     * Categorized when the sum of the splits equals the transaction amount;
+     * any difference (including no split at all) is the uncategorized part.
+     * @var Collection<int, TransactionSplit>
+     */
+    #[ORM\OneToMany(targetEntity: TransactionSplit::class, mappedBy: 'transaction', cascade: ['persist'], orphanRemoval: true)]
     #[Groups(['transaction:read', 'transaction:update'])]
-    #[ApiProperty(readableLink: false, writableLink: false)]
-    private ?Category $category = null;
+    #[Assert\Valid]
+    private Collection $splits;
 
         public function __construct()
     {
         $this->id = Uuid::v7();
+        $this->splits = new ArrayCollection();
     }
 
     public function getExternalId(): ?string
@@ -281,14 +290,27 @@ class Transaction
         return $this;
     }
 
-    public function getCategory(): ?Category
+    /**
+     * @return Collection<int, TransactionSplit>
+     */
+    public function getSplits(): Collection
     {
-        return $this->category;
+        return $this->splits;
     }
 
-    public function setCategory(?Category $category): static
+    public function addSplit(TransactionSplit $split): static
     {
-        $this->category = $category;
+        if (!$this->splits->contains($split)) {
+            $this->splits->add($split);
+            $split->setTransaction($this);
+        }
+
+        return $this;
+    }
+
+    public function removeSplit(TransactionSplit $split): static
+    {
+        $this->splits->removeElement($split);
 
         return $this;
     }

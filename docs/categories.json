@@ -1,0 +1,182 @@
+{
+    "version": 1,
+    "categories": [
+        {
+            "id": "housing",
+            "emoji": "🏠",
+            "type": "expense",
+            "name": { "fr": "Logement", "en": "Housing" },
+            "subcategories": [
+                { "id": "housing.rent_mortgage", "name": { "fr": "Loyer / Crédit immobilier", "en": "Rent / Mortgage" } },
+                { "id": "housing.charges", "name": { "fr": "Charges & copropriété", "en": "Service charges & HOA" } },
+                { "id": "housing.utilities", "name": { "fr": "Énergie & eau", "en": "Energy & water" } },
+                { "id": "housing.insurance", "name": { "fr": "Assurance habitation", "en": "Home insurance" } },
+                { "id": "housing.home_works", "name": { "fr": "Maison & travaux", "en": "Home & renovation" } }
+            ]
+        },
+        {
+            "id": "food",
+            "emoji": "🛒",
+            "type": "expense",
+            "name": { "fr": "Alimentation", "en": "Food & dining" },
+            "subcategories": [
+                { "id": "food.groceries", "name": { "fr": "Courses", "en": "Groceries" } },
+                { "id": "food.restaurants_bars", "name": { "fr": "Restaurants & bars", "en": "Restaurants & bars" } },
+                { "id": "food.fastfood_delivery", "name": { "fr": "Fast-food & livraison", "en": "Fast food & delivery" } },
+                { "id": "food.canteen_snacks", "name": { "fr": "Cantine & snacking", "en": "Canteen & snacks" } }
+            ]
+        },
+        {
+            "id": "transport",
+            "emoji": "🚗",
+            "type": "expense",
+            "name": { "fr": "Transports", "en": "Transportation" },
+            "subcategories": [
+                { "id": "transport.fuel", "name": { "fr": "Carburant / Recharge", "en": "Fuel / EV charging" } },
+                { "id": "transport.maintenance", "name": { "fr": "Entretien & réparation", "en": "Maintenance & repairs" } },
+                { "id": "transport.insurance", "name": { "fr": "Assurance auto", "en": "Car insurance" } },
+                { "id": "transport.tolls_parking", "name": { "fr": "Péage & parking", "en": "Tolls & parking" } },
+                { "id": "transport.public", "name": { "fr": "Transports en commun", "en": "Public transport" } },
+                { "id": "transport.taxi", "name": { "fr": "Taxi / VTC", "en": "Taxi / Ride-hailing" } },
+                { "id": "transport.vehicle", "name": { "fr": "Achat / Crédit véhicule", "en": "Vehicle purchase / loan" } }
+            ]
+        },
+        {
+            "id": "subscriptions",
+            "emoji": "📱",
+            "type": "expense",
+            "name": { "fr": "Abonnements & télécoms", "en": "Subscriptions & telecom" },
+            "subcategories": [
+                { "id": "subscriptions.mobile", "name": { "fr": "Mobile", "en": "Mobile phone" } },
+                { "id": "subscriptions.internet", "name": { "fr": "Internet / Box", "en": "Internet" } },
+                { "id": "subscriptions.streaming", "name": { "fr": "Streaming", "en": "Streaming" } },
+                { "id": "subscriptions.software_press", "name": { "fr": "Logiciels, cloud & presse", "en": "Software, cloud & news" } }
+            ]
+        },
+        {
+            "id": "shopping",
+            "emoji": "🛍️",
+            "type": "expense",
+            "name": { "fr": "Shopping & soins", "en": "Shopping & personal care" },
+            "subcategories": [
+                { "id": "shopping.clothing", "name": { "fr": "Vêtements & accessoires", "en": "Clothing & accessories" } },
+                { "id": "shopping.electronics", "name": { "fr": "High-tech", "en": "Electronics" } },
+                { "id": "shopping.beauty", "name": { "fr": "Coiffure & beauté", "en": "Hair & beauty" } },
+                { "id": "shopping.other", "name": { "fr": "Autres achats", "en": "Other purchases" } }
+            ]
+        },
+        {
+            "id": "health",
+            "emoji": "🏥",
+            "type": "expense",
+            "name": { "fr": "Santé", "en": "Health" },
+            "subcategories": [
+                { "id": "health.doctors", "name": { "fr": "Médecins & spécialistes", "en": "Doctors & specialists" } },
+                { "id": "health.pharmacy", "name": { "fr": "Pharmacie", "en": "Pharmacy" } },
+                { "id": "health.dental_optical", "name": { "fr": "Dentaire & optique", "en": "Dental & optical" } },
+                { "id": "health.paramedical", "name": { "fr": "Paramédical", "en": "Therapy & paramedical" } },
+                { "id": "health.insurance", "name": { "fr": "Mutuelle", "en": "Health insurance" } }
+            ]
+        },
+        {
+            "id": "leisure",
+            "emoji": "🎭",
+            "type": "expense",
+            "name": { "fr": "Loisirs", "en": "Leisure" },
+            "subcategories": [
+                { "id": "leisure.outings_culture", "name": { "fr": "Sorties & culture", "en": "Outings & culture" } },
+                { "id": "leisure.sport", "name": { "fr": "Sport", "en": "Sports & fitness" } },
+                { "id": "leisure.hobbies", "name": { "fr": "Hobbies & jeux", "en": "Hobbies & games" } }
+            ]
+        },
+        {
+            "id": "travel",
+            "emoji": "✈️",
+            "type": "expense",
+            "name": { "fr": "Voyages", "en": "Travel" },
+            "subcategories": [
+                { "id": "travel.transport", "name": { "fr": "Transport", "en": "Transport" } },
+                { "id": "travel.accommodation", "name": { "fr": "Hébergement", "en": "Accommodation" } },
+                { "id": "travel.activities", "name": { "fr": "Activités sur place", "en": "Activities" } }
+            ]
+        },
+        {
+            "id": "kids",
+            "emoji": "👨‍👩‍👧",
+            "type": "expense",
+            "name": { "fr": "Enfants", "en": "Kids" },
+            "subcategories": [
+                { "id": "kids.childcare", "name": { "fr": "Garde", "en": "Childcare" } },
+                { "id": "kids.school", "name": { "fr": "École & cantine", "en": "School & lunches" } },
+                { "id": "kids.activities", "name": { "fr": "Activités", "en": "Activities" } },
+                { "id": "kids.supplies_allowance", "name": { "fr": "Équipement & argent de poche", "en": "Supplies & allowance" } }
+            ]
+        },
+        {
+            "id": "pets",
+            "emoji": "🐶",
+            "type": "expense",
+            "optional": true,
+            "name": { "fr": "Animaux", "en": "Pets" },
+            "subcategories": [
+                { "id": "pets.food_supplies", "name": { "fr": "Nourriture & accessoires", "en": "Food & supplies" } },
+                { "id": "pets.vet", "name": { "fr": "Vétérinaire & soins", "en": "Vet & care" } }
+            ]
+        },
+        {
+            "id": "taxes_bank",
+            "emoji": "🏛️",
+            "type": "expense",
+            "name": { "fr": "Impôts & banque", "en": "Taxes & banking" },
+            "subcategories": [
+                { "id": "taxes_bank.income_tax", "name": { "fr": "Impôt sur le revenu", "en": "Income tax" } },
+                { "id": "taxes_bank.property_tax", "name": { "fr": "Taxe foncière & taxes locales", "en": "Property & local taxes" } },
+                { "id": "taxes_bank.bank_fees", "name": { "fr": "Frais bancaires & agios", "en": "Bank fees & overdraft charges" } },
+                { "id": "taxes_bank.loans", "name": { "fr": "Crédit conso & intérêts", "en": "Personal loans & interest" } }
+            ]
+        },
+        {
+            "id": "gifts",
+            "emoji": "🎁",
+            "type": "expense",
+            "name": { "fr": "Cadeaux & dons", "en": "Gifts & donations" },
+            "subcategories": [
+                { "id": "gifts.gifts", "name": { "fr": "Cadeaux", "en": "Gifts" } },
+                { "id": "gifts.donations", "name": { "fr": "Dons & associations", "en": "Donations & charities" } }
+            ]
+        },
+        {
+            "id": "misc",
+            "emoji": "❓",
+            "type": "expense",
+            "name": { "fr": "Divers", "en": "Miscellaneous" },
+            "subcategories": [
+                { "id": "misc.cash", "name": { "fr": "Retraits d'espèces", "en": "Cash withdrawals" } },
+                { "id": "misc.uncategorized", "name": { "fr": "À catégoriser", "en": "Uncategorized" } }
+            ]
+        },
+        {
+            "id": "income",
+            "emoji": "💰",
+            "type": "income",
+            "name": { "fr": "Revenus", "en": "Income" },
+            "subcategories": [
+                { "id": "income.salary", "name": { "fr": "Salaire & primes", "en": "Salary & bonuses" } },
+                { "id": "income.benefits", "name": { "fr": "Aides & allocations", "en": "Benefits & allowances" } },
+                { "id": "income.refunds", "name": { "fr": "Remboursements", "en": "Refunds & reimbursements" } },
+                { "id": "income.other", "name": { "fr": "Autres revenus", "en": "Other income" } }
+            ]
+        },
+        {
+            "id": "internal",
+            "emoji": "🔁",
+            "type": "transfer",
+            "excludeFromStats": true,
+            "name": { "fr": "Mouvements internes", "en": "Internal transfers" },
+            "subcategories": [
+                { "id": "internal.transfers", "name": { "fr": "Virements entre comptes", "en": "Transfers between accounts" } },
+                { "id": "internal.savings", "name": { "fr": "Épargne & placements", "en": "Savings & investments" } }
+            ]
+        }
+    ]
+}

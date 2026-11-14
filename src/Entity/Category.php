@@ -13,6 +13,7 @@ use ApiPlatform\Metadata\Post;
 use App\Entity\Traits\DeletableTrait;
 use App\Entity\Traits\TimestampableTrait;
 use App\Entity\Traits\UuidTrait;
+use App\Enum\CategoryType;
 use App\Repository\CategoryRepository;
 use App\State\CategoryProcessor;
 use Doctrine\Common\Collections\ArrayCollection;
@@ -62,13 +63,20 @@ class Category
     #[Groups(['category:read', 'category:create'])]
     private ?string $name = null;
 
+    /**
+     * Set by the catalog sync for system roots; inherited from the parent otherwise (see setParent()).
+     */
+    #[ORM\Column(length: 255, enumType: CategoryType::class, options: ['default' => 'expense'])]
+    #[Groups(['category:read'])]
+    private CategoryType $type = CategoryType::EXPENSE;
+
     #[ORM\ManyToOne(targetEntity: self::class, inversedBy: 'children')]
     #[Assert\NotBlank]
     #[Assert\Expression(
         'value === null or value.getParent() === null',
         message: 'The parent must be a root category.',
     )]
-    #[Groups(['category:create'])]
+    #[Groups(['category:read', 'category:create'])]
     #[ApiProperty(readableLink: false, writableLink: false)]
     private ?self $parent = null;
 
@@ -120,6 +128,23 @@ class Category
     public function setParent(?self $parent): static
     {
         $this->parent = $parent;
+
+        // A sub-category always has the type of its root
+        if ($parent) {
+            $this->type = $parent->getType();
+        }
+
+        return $this;
+    }
+
+    public function getType(): CategoryType
+    {
+        return $this->type;
+    }
+
+    public function setType(CategoryType $type): static
+    {
+        $this->type = $type;
 
         return $this;
     }

@@ -3,6 +3,7 @@
 namespace App\Command;
 
 use App\Entity\Category;
+use App\Enum\CategoryType;
 use App\Repository\CategoryRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Console\Attribute\AsCommand;
@@ -65,10 +66,18 @@ final readonly class CategorySyncCommand
         };
 
         foreach ($catalog['categories'] as $item) {
-            $category = $upsert($item['id'], null);
+            // Roots carry the type; sub-categories inherit it in setParent()
+            $category = $upsert($item['id'], null)->setType(CategoryType::from($item['type']));
 
             foreach ($item['subcategories'] ?? [] as $subItem) {
                 $upsert($subItem['id'], $category);
+            }
+        }
+
+        // User sub-categories follow the type of their (system) parent
+        foreach ($this->categoryRepository->findAll() as $category) {
+            if (null !== $category->getOwner() && $category->getParent()) {
+                $category->setType($category->getParent()->getType());
             }
         }
 

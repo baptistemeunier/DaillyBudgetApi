@@ -54,7 +54,7 @@ final class TransactionVoter extends Voter
         }
 
 
-        if (Uuid::isValid($subject) && $attribute === self::ACCOUNT_READ) {
+        if ($attribute === self::ACCOUNT_READ && is_string($subject) && Uuid::isValid($subject)) {
             $account = $this->accountRepository->find($subject);
             if(!$account) {
                 return false;
@@ -69,7 +69,7 @@ final class TransactionVoter extends Voter
         }
 
         if (!$subject instanceof Transaction) {
-            throw new \LogicException("subject must be instance of Account");
+            throw new \LogicException("subject must be instance of Transaction");
         }
 
         return $this->voteOnItem($attribute, $subject, $token, $vote);
@@ -114,6 +114,15 @@ final class TransactionVoter extends Voter
                     $vote?->addReason('The user does not have write access to this resource.');
 
                     return false;
+                }
+
+                // After denormalization: the new splits can only use categories visible to the user
+                foreach ($subject->getSplits() as $split) {
+                    if($split->getCategory() && !$this->security->isGranted(CategoryVoter::READ, $split->getCategory())) {
+                        $vote?->addReason('The user cannot use this category.');
+
+                        return false;
+                    }
                 }
 
                 return true;
