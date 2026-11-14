@@ -16,6 +16,7 @@ use App\Entity\AccountSync;
 use App\Entity\User;
 use App\Enum\AccountStatus;
 use App\Enum\AccountSyncStatus;
+use App\Enum\AccountType;
 use App\Enum\RequisitionStatus;
 use App\Message\AccountSyncRequest;
 use App\Repository\AccountRepository;
@@ -141,7 +142,8 @@ readonly class AccountConnectionProcessor implements ProcessorInterface
                     ->setIban($externalAccount['iban'])
                     ->setOwner($accountConnection->getOwner())
                     ->setExternalId(Uuid::fromString($externalAccount['id']))
-                    ->setBankId($externalAccount['institution_id']);
+                    ->setBankId($externalAccount['institution_id'])
+                    ->setType($this->guessAccountType($accountId));
 
                 $this->entityManager->persist($account);
             }
@@ -232,5 +234,25 @@ readonly class AccountConnectionProcessor implements ProcessorInterface
         $this->entityManager->flush();
 
         return null;
+    }
+
+    /**
+     * Only called when the account is discovered: the user can change the type afterwards.
+     * The details endpoint has its own GoCardless quota, a failure must not block the connection.
+     */
+    private function guessAccountType(string $accountId): AccountType
+    {
+        try {
+            $details = $this->goCardlessClient->getAccountDetails($accountId);
+        } catch (\Throwable $exception) {
+            $this->logger->warning('Account details unavailable, account type defaults to checking.', [
+                'external_account_id' => $accountId,
+                'exception' => $exception,
+            ]);
+
+            return AccountType::CHECKING;
+        }
+
+        return AccountType::fromCashAccountType($details['account']['cashAccountType'] ?? null);
     }
 }

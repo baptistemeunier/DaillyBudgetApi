@@ -5,6 +5,7 @@ namespace App\Repository;
 use App\Entity\Transaction;
 use App\Entity\TransactionSplit;
 use App\Entity\User;
+use App\Enum\AccountType;
 use App\Enum\CategoryType;
 use App\Enum\Currency;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
@@ -157,7 +158,8 @@ class TransactionRepository extends ServiceEntityRepository
     }
 
     /**
-     * Transactions (alias "t") of the user's active accounts, in the currency, booked in [start, end[.
+     * Transactions (alias "t") of the user's active checking accounts, in the currency, booked in [start, end[.
+     * Savings and investment accounts stay out of the budget.
      */
     private function filterPeriod(QueryBuilder $qb, User $owner, Currency $currency, \DateTimeImmutable $start, \DateTimeImmutable $end): QueryBuilder
     {
@@ -165,10 +167,12 @@ class TransactionRepository extends ServiceEntityRepository
             ->join('t.account', 'period_account')
             ->andWhere('period_account.owner = :period_owner')
             ->andWhere('period_account.deletedAt IS NULL')
+            ->andWhere('period_account.type = :period_account_type')
             ->andWhere('t.currency = :period_currency')
             ->andWhere('t.bookingAt >= :period_start')
             ->andWhere('t.bookingAt < :period_end')
             ->setParameter('period_owner', $owner->getId(), UuidType::NAME)
+            ->setParameter('period_account_type', AccountType::CHECKING)
             ->setParameter('period_currency', $currency)
             ->setParameter('period_start', $start)
             ->setParameter('period_end', $end);

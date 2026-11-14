@@ -13,6 +13,7 @@ use App\Entity\Traits\TimestampableTrait;
 use App\Entity\Traits\UuidTrait;
 use App\Enum\AccountStatus;
 use App\Enum\AccountSyncStatus;
+use App\Enum\AccountType;
 use App\Enum\Currency;
 use App\Repository\AccountRepository;
 use Doctrine\DBAL\Types\Types;
@@ -67,6 +68,13 @@ class Account
     #[Groups(['account:read', 'account:update'])]
     #[Assert\Length(max: 255)]
     private ?string $displayName = null;
+
+    /**
+     * Only checking accounts count in the budget (GET /statements/{period}).
+     */
+    #[ORM\Column(length: 20, enumType: AccountType::class, options: ['default' => AccountType::CHECKING->value])]
+    #[Groups(['account:read', 'account:update'])]
+    private AccountType $type = AccountType::CHECKING;
 
     #[ORM\Column(length: 255, nullable: true)]
     #[Groups(['account:read'])]
@@ -192,6 +200,18 @@ class Account
         // An empty name falls back to the bank's name
         $displayName = $displayName !== null ? trim($displayName) : null;
         $this->displayName = $displayName !== '' ? $displayName : null;
+
+        return $this;
+    }
+
+    public function getType(): AccountType
+    {
+        return $this->type;
+    }
+
+    public function setType(AccountType $type): static
+    {
+        $this->type = $type;
 
         return $this;
     }
