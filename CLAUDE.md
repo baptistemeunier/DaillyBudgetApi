@@ -32,4 +32,6 @@ The API logic is described in `docs/DESIGN.md`: authentication, authorization, t
 
 @docs/DESIGN.md
 
+HTTP caching (ETag / 304, per-resource `Cache-Control`) is described in `docs/HTTP_CACHE.md`. Keep it up to date when that logic changes.
+
 Automatic categorization (merchant key, categorization rules, split source) is described in `docs/AUTO_CATEGORIZATION.md`. Keep it up to date when that logic changes.

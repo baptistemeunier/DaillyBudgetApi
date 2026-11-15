@@ -32,6 +32,8 @@ use Symfony\Component\Validator\Constraints as Assert;
 #[ORM\HasLifecycleCallbacks]
 #[ValidBudgetLines]
 #[ApiResource(
+    // Rarely changes: the client keeps it and always revalidates it with If-None-Match (304 when unchanged)
+    cacheHeaders: ['max_age' => 0, 'must_revalidate' => true],
     operations: [
         new Get(security: "is_granted('BUDGET_READ', object)"),
         // The budget of the user, if any (scoped by CurrentUserExtension)

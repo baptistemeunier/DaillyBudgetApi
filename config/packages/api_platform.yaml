@@ -17,6 +17,8 @@ api_platform:
         pagination_client_items_per_page: true
         pagination_maximum_items_per_page: 100
         cache_headers:
+            # Responses are per-user: never let a shared cache (proxy, CDN) store them
+            public: false
             vary: [Content-Type, Authorization, Origin]
 
     oauth:

@@ -32,6 +32,8 @@ use Symfony\Component\Validator\Constraints as Assert;
 #[ORM\UniqueConstraint(name: 'UNIQ_RULE', columns: ['owner_id', 'pattern', 'direction'])]
 #[ORM\HasLifecycleCallbacks]
 #[ApiResource(
+    // Rarely changes: the client keeps it and always revalidates it with If-None-Match (304 when unchanged)
+    cacheHeaders: ['max_age' => 0, 'must_revalidate' => true],
     operations: [
         new Get(security: "is_granted('CATEGORIZATION_RULE_READ', object)"),
         new GetCollection(

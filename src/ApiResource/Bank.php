@@ -31,6 +31,8 @@ use Symfony\Component\Validator\Constraints as Assert;
         ),
     ],
     normalizationContext: ['groups' => ['bank:read']],
+    // The institution list is already cached server-side for 24h (BankProvider::CACHE_TTL)
+    cacheHeaders: ['max_age' => 3600],
     provider: BankProvider::class
 )]
 class Bank
