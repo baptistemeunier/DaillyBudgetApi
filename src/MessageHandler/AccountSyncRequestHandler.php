@@ -108,7 +108,7 @@ final class AccountSyncRequestHandler
             ]);
 
         } catch (\Throwable $exception) {
-            $this->logger->error('Account synchronization failed.', [
+            $this->logger->error('Account synchronization failed: {exception}', [
                 'account_sync_id' => $syncId,
                 'account_id' => $accountId,
                 'exception' => $exception,
@@ -213,7 +213,7 @@ final class AccountSyncRequestHandler
     private function syncTransactionsType(Account $account, array $externalTransactions, bool $booked): void
     {
         foreach ($externalTransactions as $transaction) {
-            foreach (['transactionId', 'valueDate', 'transactionAmount'] as $key) {
+            foreach (['internalTransactionId', 'bookingDate', 'transactionAmount'] as $key) {
                 if(empty($transaction[$key])) {
                     throw new \LogicException(sprintf('"%s" is required.', $key));
                 }
@@ -233,22 +233,20 @@ final class AccountSyncRequestHandler
         foreach ($externalTransactions as $externalTransaction) {
             $transaction = array_find($transactions, fn ($transaction) => $transaction->getExternalId() === $externalTransaction['internalTransactionId']);
 
-            $description = $this->getDescription($externalTransaction);
             if(!$transaction) {
                 $transaction = new Transaction()
                 ->setExternalId($externalTransaction['internalTransactionId'])
                 ->setReference($externalTransaction['entryReference'] ?? null)
-                ->setDescription($description)
-                #->setDetail()
                 ->setAmount($externalTransaction['transactionAmount']['amount'])
                 ->setCurrency(Currency::from($externalTransaction['transactionAmount']['currency']))
-                ->setValueAt($externalTransaction['valueDate'] ? new DateTimeImmutable($externalTransaction['valueDate']) : null)
+                ->setValueAt(new DateTimeImmutable($externalTransaction['valueDate'] ?? $externalTransaction['bookingDate']))
                 #->setExternalCreatedAt()
                 #->setExternalTransactionType()
                 ->setExternalTransactionCode($externalTransaction['bankTransactionCode'] ?? null)
                 ->setAccount($account)
                 ->setRawData($externalTransaction);
 
+                $this->setDescription($transaction, $externalTransaction);
                 $this->entityManager->persist($transaction);
             }
 
@@ -258,16 +256,32 @@ final class AccountSyncRequestHandler
         }
     }
 
-    private function getDescription(array $transaction): string
+    private function setDescription(Transaction $transaction, array $externalTransaction): void
     {
-        if(!empty($transaction['remittanceInformationUnstructuredArray'])) {
-            return reset($transaction['remittanceInformationUnstructuredArray']);
+        $description = (Money::toCents($transaction->getAmount()) > 0)
+            ? $externalTransaction['debtorName'] ?? null
+            : $externalTransaction['creditorName'] ?? null;
+
+        $detail = null;
+        if(!empty($externalTransaction['remittanceInformationUnstructuredArray'])) {
+            $detail = implode(' ', array_filter($externalTransaction['remittanceInformationUnstructuredArray']));
         }
 
-        if(!empty($transaction['remittanceInformationUnstructured'])) {
-            return $transaction['remittanceInformationUnstructured'];
+        if(!$detail && !empty($externalTransaction['remittanceInformationUnstructured'])) {
+            $detail = $externalTransaction['remittanceInformationUnstructured'];
         }
 
-        throw new \LogicException('Unable to determine transaction description.');
+        if(!$description) {
+            if(empty($detail)) {
+                throw new \LogicException('Unable to determine transaction description.');
+            }
+
+            $description = mb_substr($detail, 0, 50);
+            $detail = mb_strlen($detail) > 50 ? $detail : null;
+        }
+
+        $transaction
+            ->setDescription(mb_substr($description, 255))
+            ->setDetail($detail);
     }
 }
