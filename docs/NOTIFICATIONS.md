@@ -142,7 +142,7 @@ Notifier ─▶ SendPushNotification (async) ─▶ SendPushNotificationHandler
   - 404 ou 410 : l'abonnement est mort, il est supprimé ;
   - 5xx, 429 ou erreur réseau : une exception, relancée par le transport ;
   - autre 4xx : un log, sans relance.
-- **VAPID** : `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` (`mailto:` ou l'URL du site). Les clés se génèrent une fois avec `Minishlink\WebPush\VAPID::createVapidKeys()`. La clé publique n'est pas secrète : le front la reçoit dans `NUXT_PUBLIC_VAPID_PUBLIC_KEY`, sans endpoint. Sans clés, seul l'envoi échoue. L'extension `gmp` accélère le chiffrement.
+- **VAPID** : `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` (`mailto:` ou l'URL du site). Les clés se génèrent une fois avec `Minishlink\WebPush\VAPID::createVapidKeys()`. La clé publique n'est pas secrète : le front la reçoit dans `NUXT_PUBLIC_VAPID_PUBLIC_KEY`, sans endpoint (en prod, `compose.prod.yaml` la remplit avec `VAPID_PUBLIC_KEY`). Sans clés, seul l'envoi échoue. L'extension `gmp` accélère le chiffrement.
 - **Options** : `TTL` de 24 h et `urgency: normal`. L'en-tête `Topic` est un hash du type et du sujet, 32 caractères base64url au plus : un push pas encore reçu (appareil hors ligne) est remplacé par le suivant au lieu de s'empiler.
 
 - **Test** : `bin/console app:notifications:test-push` liste les appareils abonnés. Avec un utilisateur (username ou uuid), ou `--device=<id>`, la commande envoie tout de suite un push de test, sans passer par la file. Elle affiche la réponse du service de push pour chaque appareil, sans rien créer ni modifier en base. Deux modes :
