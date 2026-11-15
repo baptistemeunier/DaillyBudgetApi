@@ -13,7 +13,7 @@ use App\Util\Money;
 use Symfony\Component\Messenger\MessageBusInterface;
 
 /**
- * Applies the categorization rules: a transaction of a synced account, without any split set by the user,
+ * Applies the categorization rules: a transaction of a synced account, without any split set or confirmed by the user,
  * gets a single split of its whole amount on the category of the best matching rule (source "rule").
  * Best rule: the longest pattern, then the one with a direction. The changes are flushed by the caller.
  * The categorization runs asynchronously, per account (AccountCategorizationRequest).
@@ -33,7 +33,7 @@ final readonly class TransactionCategorizer
      */
     public function categorize(Transaction $transaction, array $rules): bool
     {
-        if ($transaction->getAccount()?->isManual() || $transaction->hasManualSplit()) {
+        if ($transaction->getAccount()?->isManual() || $transaction->hasUserSplit()) {
             return false;
         }
 

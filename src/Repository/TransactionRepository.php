@@ -86,7 +86,7 @@ class TransactionRepository extends ServiceEntityRepository
     }
 
     /**
-     * Transactions of the account with a merchant key and without split set by the user, with their splits.
+     * Transactions of the account with a merchant key and without split set or confirmed by the user, with their splits.
      *
      * @return Transaction[]
      */
@@ -98,11 +98,11 @@ class TransactionRepository extends ServiceEntityRepository
             ->andWhere('t.account = :account')
             ->andWhere('t.merchantKey IS NOT NULL')
             ->andWhere(sprintf(
-                'NOT EXISTS (SELECT manual_split.id FROM %s manual_split WHERE manual_split.transaction = t AND manual_split.source = :manual)',
+                'NOT EXISTS (SELECT user_split.id FROM %s user_split WHERE user_split.transaction = t AND user_split.source IN (:user_sources))',
                 TransactionSplit::class,
             ))
             ->setParameter('account', $account->getId(), UuidType::NAME)
-            ->setParameter('manual', SplitSource::MANUAL)
+            ->setParameter('user_sources', array_map(static fn (SplitSource $source) => $source->value, SplitSource::userSet()))
             ->getQuery()
             ->getResult();
     }

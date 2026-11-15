@@ -1,6 +1,6 @@
 # Catégorisation automatique
 
-Les transactions synchronisées arrivent sans catégorie. Pour éviter à l'utilisateur de tout catégoriser à la main, des **règles personnelles** posent la catégorie à sa place. L'utilisateur garde la main : un split posé par une règle est marqué comme tel, et il le confirme ou le corrige.
+Les transactions synchronisées arrivent sans catégorie. Pour éviter à l'utilisateur de tout catégoriser à la main, des **règles personnelles** posent la catégorie à sa place. L'utilisateur garde la main : un split posé par une règle est marqué comme tel, et il le confirme ou le corrige. Une confirmation est enregistrée comme telle, pour les statistiques futures.
 
 Pour l'instant, seules les règles existent (voir « Évolutions »).
 
@@ -29,23 +29,31 @@ Pour l'instant, seules les règles existent (voir « Évolutions »).
 
 | Moment | Ce qui est catégorisé |
 |---|---|
-| Après une sync réussie : `AccountSyncRequestHandler` envoie `AccountCategorizationRequest` (async) | les transactions du compte sans split `manual` (`AccountCategorizationRequestHandler`) |
+| Après une sync réussie : `AccountSyncRequestHandler` envoie `AccountCategorizationRequest` (async) | les transactions du compte sans split `manual` ni `confirmed` (`AccountCategorizationRequestHandler`) |
 | POST / PATCH `/categorization_rules` | un `AccountCategorizationRequest` par compte synchronisé actif de l'utilisateur (async) |
 | PATCH `/transactions/{id}` avec `rememberCategory: true` | idem, une fois la règle créée ou mise à jour |
 | `app:transactions:merchant-keys --apply-rules` | toutes les transactions |
 
-Une transaction est catégorisée seulement si **aucun de ses splits n'est `manual`**. Elle reçoit alors un unique split du montant total, avec `source: rule` et un lien vers la règle. Un split posé par une règle peut être remplacé par une meilleure règle. Toutes les règles de l'owner sont toujours comparées : la plus précise garde ses transactions. Après un changement de règle, le résultat apparaît dès que le worker a traité les messages (`messenger:consume async`).
+Une transaction est catégorisée seulement si **aucun de ses splits n'est `manual` ou `confirmed`** (`SplitSource::userSet()`). Elle reçoit alors un unique split du montant total, avec `source: rule` et un lien vers la règle. Un split posé par une règle peut être remplacé par une meilleure règle. Toutes les règles de l'owner sont toujours comparées : la plus précise garde ses transactions. Après un changement de règle, le résultat apparaît dès que le worker a traité les messages (`messenger:consume async`).
 
 Supprimer une règle conserve les splits qu'elle a posés (leur `rule` passe à `null`, ils restent `source: rule`).
 
 ### Origine d'un split
 
-`TransactionSplit.source` (`manual` | `rule`, lecture seule) et `_links.rule`.
+`TransactionSplit.source` (lecture seule) et `_links.rule` :
 
-Le PATCH (`TransactionProcessor`) recrée tous les splits envoyés, donc tout split envoyé par le client devient `manual` :
+| `source` | Signification | Revue |
+|---|---|---|
+| `rule` | posé par une règle | à revoir |
+| `confirmed` | posé par une règle, validé par l'utilisateur ; `_links.rule` conservé | faite |
+| `manual` | envoyé par l'utilisateur (saisi ou corrigé) | faite |
 
-- **confirmer** = renvoyer le même split ;
-- **corriger** = en envoyer un autre.
+Dans le PATCH (`TransactionProcessor`) :
+
+- **confirmer** = `{"confirm": true}` sans `splits`. Les splits `rule` passent à `confirmed`. C'est idempotent, et la requête renvoie 422 s'il n'y a aucun split posé par une règle.
+- **corriger** = envoyer `splits`. Ils sont tous recréés en `manual`. `confirm` et `splits` ensemble → 422.
+
+Statistiques : on peut compter les `confirmed` par règle (`rule_id`). Les corrections ne sont pas tracées : un split corrigé est un `manual` comme un autre.
 
 ## API
 
@@ -53,15 +61,15 @@ Le PATCH (`TransactionProcessor`) recrée tous les splits envoyés, donc tout sp
 |---|---|
 | `GET /categorization_rules`, `GET /categorization_rules/{id}` | `category:read`, owner uniquement (`CurrentUserExtension`, `CategorizationRuleVoter`) |
 | `POST /categorization_rules`, `PATCH`, `DELETE /categorization_rules/{id}` | `category:write`, owner uniquement. Doublon `(pattern, direction)` → 422 |
-| `PATCH /transactions/{id}` (DTO `UpdateTransaction`) | `splits` remplace tous les splits (`null` = inchangés, `[]` = non catégorisée). Avec `rememberCategory: true`, il faut un unique split du montant total avec une catégorie, sinon 422 : la règle `merchantKey + sens → catégorie` est créée ou mise à jour |
-| `GET /transactions?autoCategorized=true` | transactions avec un split `source: rule`, à revoir |
+| `PATCH /transactions/{id}` (DTO `UpdateTransaction`) | `confirm: true` confirme les splits posés par une règle. `splits` remplace tous les splits (`null` = inchangés, `[]` = non catégorisée). Avec `rememberCategory: true`, il faut un unique split du montant total avec une catégorie, sinon 422 : la règle `merchantKey + sens → catégorie` est créée ou mise à jour |
+| `GET /transactions?autoCategorized=true` | transactions avec un split `source: rule`, à revoir (les `confirmed` en sortent) |
 | `GET /user_actions` | `TRANSACTIONS_TO_REVIEW` (priorité 5) avec le nombre de transactions à revoir |
 
 UX côté client :
 
 - une case « Toujours classer ainsi » sur l'écran de catégorisation ;
 - un écran « Règles » (liste, édition, suppression) ;
-- une liste « À vérifier » avec un bouton « Confirmer » qui renvoie le split.
+- une liste « À vérifier » avec un bouton « Confirmer » (`confirm: true`) et la correction habituelle des splits.
 
 ## Évolutions
 

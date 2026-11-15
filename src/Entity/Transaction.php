@@ -373,10 +373,10 @@ class Transaction
     }
 
     /**
-     * A split set by the user: the categorization rules leave the transaction alone.
+     * A split set or confirmed by the user: the categorization rules leave the transaction alone.
      */
-    public function hasManualSplit(): bool
+    public function hasUserSplit(): bool
     {
-        return $this->splits->exists(static fn (int $key, TransactionSplit $split) => SplitSource::MANUAL === $split->getSource());
+        return $this->splits->exists(static fn (int $key, TransactionSplit $split) => in_array($split->getSource(), SplitSource::userSet(), true));
     }
 }

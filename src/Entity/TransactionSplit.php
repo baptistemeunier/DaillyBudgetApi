@@ -59,7 +59,7 @@ class TransactionSplit
 
     /**
      * Read only: every split sent through the API is "manual"; "rule" when set by a categorization rule,
-     * until the user confirms it (sends it back) or changes it.
+     * until the user confirms it ("confirmed", PATCH with confirm: true) or changes it ("manual").
      */
     #[ORM\Column(length: 255, enumType: SplitSource::class, options: ['default' => 'manual'])]
     #[Groups(['transaction:read'])]

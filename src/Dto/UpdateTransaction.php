@@ -17,7 +17,7 @@ use Symfony\Component\Validator\Constraints as Assert;
 class UpdateTransaction
 {
     /**
-     * Replaces all the splits (each one becomes "manual": sending back a split set by a rule confirms it).
+     * Replaces all the splits (each one becomes "manual"; to confirm the splits set by a rule, use confirm instead).
      * null: splits unchanged (e.g. only rememberCategory); []: uncategorized.
      *
      * Explicit nativeType: without phpdocumentor/type-resolver, Symfony does not read the @var below
@@ -37,4 +37,10 @@ class UpdateTransaction
      * "merchant key + direction → category" and applies it to the similar transactions.
      */
     public bool $rememberCategory = false;
+
+    /**
+     * Confirms the splits set by a categorization rule: they become "confirmed" (the rule link is kept, for the stats).
+     * Cannot be combined with splits.
+     */
+    public bool $confirm = false;
 }

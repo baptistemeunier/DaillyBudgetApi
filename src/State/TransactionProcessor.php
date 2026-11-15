@@ -10,6 +10,7 @@ use App\Entity\CategorizationRule;
 use App\Entity\Transaction;
 use App\Entity\TransactionSplit;
 use App\Enum\CategoryType;
+use App\Enum\SplitSource;
 use App\Enum\TransactionDirection;
 use App\Repository\CategorizationRuleRepository;
 use App\Repository\TransactionRepository;
@@ -29,6 +30,7 @@ use Symfony\Component\Validator\Validator\ValidatorInterface;
  * PATCH /transactions/{id} (UpdateTransaction): replaces the splits of the transaction, then checks them
  * (voter + entity validation), keeps the mirrors of the saving splits (see SavingMirrorLinker) and recomputes
  * the balance of the manual accounts whose mirror transactions changed.
+ * With confirm, marks the splits set by a rule as confirmed by the user.
  * With rememberCategory, saves the rule "merchant key + direction → category" and applies it to the similar transactions (async).
  */
 final readonly class TransactionProcessor implements ProcessorInterface
@@ -56,8 +58,16 @@ final readonly class TransactionProcessor implements ProcessorInterface
         $transaction = $this->transactionRepository->find($uriVariables['id'] ?? null)
             ?? throw new NotFoundHttpException('Transaction not found.');
 
+        if ($data->confirm && null !== $data->splits) {
+            throw new UnprocessableEntityHttpException('confirm cannot be combined with splits: sent splits are always "manual".');
+        }
+
         if (null !== $data->splits) {
             $this->replaceSplits($transaction, $data);
+        }
+
+        if ($data->confirm) {
+            $this->confirmRuleSplits($transaction);
         }
 
         // The new splits can only use categories and accounts visible to the user
@@ -112,6 +122,24 @@ final readonly class TransactionProcessor implements ProcessorInterface
                 ->setAmount($input->amount)
                 ->setCounterpartAccount($input->counterpartAccount)
                 ->setCounterpartAmount($input->counterpartAmount));
+        }
+    }
+
+    /**
+     * The splits set by a rule become "confirmed". Idempotent: already confirmed splits are accepted.
+     */
+    private function confirmRuleSplits(Transaction $transaction): void
+    {
+        $confirmable = $transaction->getSplits()->filter(
+            static fn (TransactionSplit $split) => in_array($split->getSource(), [SplitSource::RULE, SplitSource::CONFIRMED], true),
+        );
+
+        if ($confirmable->isEmpty()) {
+            throw new UnprocessableEntityHttpException('confirm requires a split set by a categorization rule.');
+        }
+
+        foreach ($confirmable as $split) {
+            $split->setSource(SplitSource::CONFIRMED);
         }
     }
 
