@@ -8,20 +8,22 @@ use App\Client\GoCardlessRateLimitException;
 use App\Entity\Account;
 use App\Entity\AccountSync;
 use App\Entity\Transaction;
-use App\Enum\AccountStatus;
 use App\Enum\AccountSyncError;
 use App\Enum\AccountSyncStatus;
 use App\Enum\Currency;
 use App\Enum\RequisitionStatus;
+use App\Message\AccountCategorizationRequest;
 use App\Message\AccountSyncRequest;
 use App\Repository\AccountSyncRepository;
 use App\Repository\TransactionRepository;
+use App\Util\BankDescription;
 use App\Util\Money;
 use DateTimeImmutable;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\Persistence\ManagerRegistry;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
+use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Contracts\HttpClient\Exception\HttpExceptionInterface;
 
 #[AsMessageHandler]
@@ -40,6 +42,7 @@ final class AccountSyncRequestHandler
         private readonly EntityManagerInterface $entityManager,
         private GoCardlessClient $goCardlessClient,
         private ManagerRegistry $doctrine,
+        private readonly MessageBusInterface $bus,
     ) {
     }
 
@@ -129,7 +132,12 @@ final class AccountSyncRequestHandler
 
                 $em->flush();
             }
+
+            return;
         }
+
+        // Outside the try: a dispatch failure must not mark the synchronization as failed
+        $this->bus->dispatch(new AccountCategorizationRequest($accountId));
     }
 
     private function toError(\Throwable $exception): AccountSyncError
@@ -246,7 +254,7 @@ final class AccountSyncRequestHandler
                 ->setAccount($account)
                 ->setRawData($externalTransaction);
 
-                $this->setDescription($transaction, $externalTransaction);
+                BankDescription::apply($transaction, $externalTransaction);
                 $this->entityManager->persist($transaction);
             }
 
@@ -254,34 +262,5 @@ final class AccountSyncRequestHandler
                 ->setBookingAt(!empty($externalTransaction['bookingDate']) ? new DateTimeImmutable($externalTransaction['bookingDate']) : null)
                 ->setIsBooked($booked);
         }
-    }
-
-    private function setDescription(Transaction $transaction, array $externalTransaction): void
-    {
-        $description = (Money::toCents($transaction->getAmount()) > 0)
-            ? $externalTransaction['debtorName'] ?? null
-            : $externalTransaction['creditorName'] ?? null;
-
-        $detail = null;
-        if(!empty($externalTransaction['remittanceInformationUnstructuredArray'])) {
-            $detail = implode(' ', array_filter($externalTransaction['remittanceInformationUnstructuredArray']));
-        }
-
-        if(!$detail && !empty($externalTransaction['remittanceInformationUnstructured'])) {
-            $detail = $externalTransaction['remittanceInformationUnstructured'];
-        }
-
-        if(!$description) {
-            if(empty($detail)) {
-                throw new \LogicException('Unable to determine transaction description.');
-            }
-
-            $description = mb_substr($detail, 0, 50);
-            $detail = mb_strlen($detail) > 50 ? $detail : null;
-        }
-
-        $transaction
-            ->setDescription(mb_substr($description, 255))
-            ->setDetail($detail);
     }
 }

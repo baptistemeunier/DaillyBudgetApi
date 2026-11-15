@@ -10,13 +10,17 @@ use ApiPlatform\Metadata\GetCollection;
 use ApiPlatform\Metadata\Link;
 use ApiPlatform\Metadata\Patch;
 use ApiPlatform\Metadata\QueryParameter;
+use App\Doctrine\Filter\AutoCategorizedFilter;
+use App\Dto\UpdateTransaction;
 use App\Doctrine\Filter\SplitCategoryFilter;
 use App\Doctrine\Filter\UncategorizedFilter;
 use App\Entity\Traits\TimestampableTrait;
 use App\Entity\Traits\UuidTrait;
 use App\Enum\Currency;
+use App\Enum\SplitSource;
 use App\Repository\TransactionRepository;
 use App\State\TransactionProcessor;
+use App\Util\MerchantKey;
 use App\Validator\ValidTransactionSplits;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
@@ -29,6 +33,7 @@ use Symfony\Component\Validator\Constraints as Assert;
 
 #[ORM\Entity(repositoryClass: TransactionRepository::class)]
 #[ORM\UniqueConstraint(name: 'UNIQ_EXTERNAL_ID', columns: ['account_id', 'external_id'])]
+#[ORM\Index(name: 'IDX_MERCHANT_KEY', columns: ['merchant_key'])]
 #[ORM\HasLifecycleCallbacks]
 #[ValidTransactionSplits]
 #[ApiResource(
@@ -55,13 +60,18 @@ use Symfony\Component\Validator\Constraints as Assert;
             security: "is_granted('ACCOUNT_READ')",
             parameters: [
                 'uncategorized' => new QueryParameter(
-                    filter: new UncategorizedFilter(),
                     schema: ['type' => 'boolean'],
+                    filter: new UncategorizedFilter(),
                     description: 'true: only the transactions not fully categorized (sum of the splits ≠ amount)',
                 ),
+                'autoCategorized' => new QueryParameter(
+                    schema: ['type' => 'boolean'],
+                    filter: new AutoCategorizedFilter(),
+                    description: 'true: only the transactions categorized by a rule, to be reviewed by the user',
+                ),
                 'category' => new QueryParameter(
-                    filter: new SplitCategoryFilter(),
                     schema: ['type' => 'string'],
+                    filter: new SplitCategoryFilter(),
                     description: 'Category UUID or IRI: only the transactions with a split on exactly this category',
                 ),
                 // ?bookingAt[after]=2026-10-01&bookingAt[strictly_before]=2026-12-01
@@ -78,11 +88,10 @@ use Symfony\Component\Validator\Constraints as Assert;
                 ),
             ],
         ),
+        // The processor maps the input on the transaction, then checks the new splits (voter + validation)
         new Patch(
-            denormalizationContext: ['groups' => ['transaction:update']],
-            // Checks the new splits: their categories must be visible to the user
+            input: UpdateTransaction::class,
             security: "is_granted('TRANSACTION_UPDATE', object)",
-            securityPostDenormalize: "is_granted('TRANSACTION_UPDATE', object)",
             processor: TransactionProcessor::class,
         ),
     ],
@@ -104,6 +113,10 @@ class Transaction
     #[ORM\Column(length: 255)]
     #[Groups(['transaction:read'])]
     private ?string $description = null;
+
+    #[ORM\Column(length: MerchantKey::MAX_LENGTH, nullable: true)]
+    #[Groups(['transaction:read'])]
+    private ?string $merchantKey = null;
 
     #[ORM\Column(type: Types::TEXT, nullable: true)]
     #[Groups(['transaction:read'])]
@@ -150,11 +163,11 @@ class Transaction
      * @var Collection<int, TransactionSplit>
      */
     #[ORM\OneToMany(targetEntity: TransactionSplit::class, mappedBy: 'transaction', cascade: ['persist'], orphanRemoval: true)]
-    #[Groups(['transaction:read', 'transaction:update'])]
+    #[Groups(['transaction:read'])]
     #[Assert\Valid]
     private Collection $splits;
 
-        public function __construct()
+    public function __construct()
     {
         $this->id = Uuid::v7();
         $this->splits = new ArrayCollection();
@@ -192,8 +205,14 @@ class Transaction
     public function setDescription(string $description): static
     {
         $this->description = $description;
+        $this->merchantKey = MerchantKey::fromDescription($description);
 
         return $this;
+    }
+
+    public function getMerchantKey(): ?string
+    {
+        return $this->merchantKey;
     }
 
     public function getDetail(): ?string
@@ -351,5 +370,13 @@ class Transaction
         $this->splits->removeElement($split);
 
         return $this;
+    }
+
+    /**
+     * A split set by the user: the categorization rules leave the transaction alone.
+     */
+    public function hasManualSplit(): bool
+    {
+        return $this->splits->exists(static fn (int $key, TransactionSplit $split) => SplitSource::MANUAL === $split->getSource());
     }
 }

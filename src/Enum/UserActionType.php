@@ -11,6 +11,7 @@ enum UserActionType: string
     case CONNECTION_TO_CONFIGURE = 'CONNECTION_TO_CONFIGURE';
     case CONNECTION_EXPIRING = 'CONNECTION_EXPIRING';
     case TRANSACTIONS_TO_CATEGORIZE = 'TRANSACTIONS_TO_CATEGORIZE';
+    case TRANSACTIONS_TO_REVIEW = 'TRANSACTIONS_TO_REVIEW';
 
     /**
      * Higher first.
@@ -22,6 +23,7 @@ enum UserActionType: string
             self::CONNECTION_TO_CONFIGURE => 75,
             self::CONNECTION_EXPIRING => 50,
             self::TRANSACTIONS_TO_CATEGORIZE => 10,
+            self::TRANSACTIONS_TO_REVIEW => 5,
         };
     }
 
@@ -32,6 +34,7 @@ enum UserActionType: string
             self::CONNECTION_TO_CONFIGURE => 'The bank connection has not been completed by the user',
             self::CONNECTION_EXPIRING => 'Access to the bank expires soon: the user should reconnect it',
             self::TRANSACTIONS_TO_CATEGORIZE => 'Some transactions are not fully categorized',
+            self::TRANSACTIONS_TO_REVIEW => 'Some transactions were categorized by a rule: the user should confirm or correct them',
         };
     }
 }

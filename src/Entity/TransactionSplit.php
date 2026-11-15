@@ -2,8 +2,8 @@
 
 namespace App\Entity;
 
-use ApiPlatform\Metadata\ApiProperty;
 use App\Entity\Traits\UuidTrait;
+use App\Enum\SplitSource;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Serializer\Attribute\Groups;
@@ -26,8 +26,7 @@ class TransactionSplit
     // Deleting a category makes this part uncategorized, the sum stays valid
     #[ORM\ManyToOne]
     #[ORM\JoinColumn(onDelete: 'SET NULL')]
-    #[Groups(['transaction:read', 'transaction:update'])]
-    #[ApiProperty(writableLink: false)] // IRI on input; output as a HAL link by the normalizer
+    #[Groups(['transaction:read'])] // output as a HAL link by the normalizer
     private ?Category $category = null;
 
     /**
@@ -40,27 +39,39 @@ class TransactionSplit
     private ?Transaction $counterpartTransaction = null;
 
     /**
-     * Input only, not stored: manual account (savings / investment) where SavingMirrorLinker keeps the mirror transaction.
-     * Saving splits only; omitted on a later PATCH, the previous mirror of the category is kept.
+     * Not stored, set from the PATCH input (UpdateTransactionSplit): manual account (savings / investment) where
+     * SavingMirrorLinker keeps the mirror transaction. Saving splits only; omitted on a later PATCH, the previous mirror of the category is kept.
      */
-    #[Groups(['transaction:update'])]
-    #[ApiProperty(writableLink: false, readable: false)]
     private ?Account $counterpartAccount = null;
 
     /**
-     * Input only, not stored: amount received on the manual counterpartAccount when its currency differs
+     * Not stored, set from the PATCH input: amount received on the manual counterpartAccount when its currency differs
      * from the transaction's (opposite sign). Same currency: the mirror is always the opposite of the split.
      */
-    #[Groups(['transaction:update'])]
-    #[ApiProperty(readable: false)]
     #[Assert\Regex('/^-?\d{1,13}(\.\d{1,2})?$/', message: 'The amount must be a decimal with at most 2 digits.')]
     private ?string $counterpartAmount = null;
 
     #[ORM\Column(type: Types::DECIMAL, precision: 15, scale: 2)]
-    #[Groups(['transaction:read', 'transaction:update'])]
+    #[Groups(['transaction:read'])]
     #[Assert\NotBlank]
     #[Assert\Regex('/^-?\d{1,13}(\.\d{1,2})?$/', message: 'The amount must be a decimal with at most 2 digits.')]
     private ?string $amount = null;
+
+    /**
+     * Read only: every split sent through the API is "manual"; "rule" when set by a categorization rule,
+     * until the user confirms it (sends it back) or changes it.
+     */
+    #[ORM\Column(length: 255, enumType: SplitSource::class, options: ['default' => 'manual'])]
+    #[Groups(['transaction:read'])]
+    private SplitSource $source = SplitSource::MANUAL;
+
+    /**
+     * Rule that set the split (source "rule"); output as a HAL link by the normalizer.
+     */
+    #[ORM\ManyToOne]
+    #[ORM\JoinColumn(onDelete: 'SET NULL')]
+    #[Groups(['transaction:read'])]
+    private ?CategorizationRule $rule = null;
 
     public function __construct()
     {
@@ -135,6 +146,30 @@ class TransactionSplit
     public function setAmount(?string $amount): static
     {
         $this->amount = $amount;
+
+        return $this;
+    }
+
+    public function getSource(): SplitSource
+    {
+        return $this->source;
+    }
+
+    public function setSource(SplitSource $source): static
+    {
+        $this->source = $source;
+
+        return $this;
+    }
+
+    public function getRule(): ?CategorizationRule
+    {
+        return $this->rule;
+    }
+
+    public function setRule(?CategorizationRule $rule): static
+    {
+        $this->rule = $rule;
 
         return $this;
     }

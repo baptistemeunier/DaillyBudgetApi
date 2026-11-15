@@ -4,15 +4,32 @@ namespace App\State;
 
 use ApiPlatform\Metadata\Operation;
 use ApiPlatform\State\ProcessorInterface;
+use ApiPlatform\Validator\Exception\ValidationException;
+use App\Dto\UpdateTransaction;
+use App\Entity\CategorizationRule;
 use App\Entity\Transaction;
+use App\Entity\TransactionSplit;
+use App\Enum\CategoryType;
+use App\Enum\TransactionDirection;
+use App\Repository\CategorizationRuleRepository;
 use App\Repository\TransactionRepository;
+use App\Security\Voter\TransactionVoter;
 use App\Service\SavingMirrorLinker;
+use App\Service\TransactionCategorizer;
+use App\Util\Money;
 use Doctrine\ORM\EntityManagerInterface;
+use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
+use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
+use Symfony\Component\HttpKernel\Exception\UnprocessableEntityHttpException;
+use Symfony\Component\Validator\Validator\ValidatorInterface;
 
 /**
- * PATCH /transactions/{id}: keeps the mirrors of the saving splits (see SavingMirrorLinker), then recomputes
+ * PATCH /transactions/{id} (UpdateTransaction): replaces the splits of the transaction, then checks them
+ * (voter + entity validation), keeps the mirrors of the saving splits (see SavingMirrorLinker) and recomputes
  * the balance of the manual accounts whose mirror transactions changed.
+ * With rememberCategory, saves the rule "merchant key + direction → category" and applies it to the similar transactions (async).
  */
 final readonly class TransactionProcessor implements ProcessorInterface
 {
@@ -21,25 +38,49 @@ final readonly class TransactionProcessor implements ProcessorInterface
         private ProcessorInterface $persistProcessor,
         private SavingMirrorLinker $savingMirrorLinker,
         private TransactionRepository $transactionRepository,
+        private CategorizationRuleRepository $ruleRepository,
+        private TransactionCategorizer $categorizer,
         private EntityManagerInterface $entityManager,
+        private Security $security,
+        private ValidatorInterface $validator,
     ) {
     }
 
     public function process(mixed $data, Operation $operation, array $uriVariables = [], array $context = []): Transaction
     {
-        if (!$data instanceof Transaction) {
-            throw new \LogicException('data must be an instance of Transaction');
+        if (!$data instanceof UpdateTransaction) {
+            throw new \LogicException('data must be an instance of UpdateTransaction');
         }
 
-        $accounts = $this->savingMirrorLinker->link($data);
+        // Already loaded (and checked) by the provider: same managed instance
+        $transaction = $this->transactionRepository->find($uriVariables['id'] ?? null)
+            ?? throw new NotFoundHttpException('Transaction not found.');
 
-        $result = $this->persistProcessor->process($data, $operation, $uriVariables, $context);
+        if (null !== $data->splits) {
+            $this->replaceSplits($transaction, $data);
+        }
+
+        // The new splits can only use categories and accounts visible to the user
+        if (!$this->security->isGranted(TransactionVoter::UPDATE, $transaction)) {
+            throw new AccessDeniedHttpException('The user cannot use these categories or accounts.');
+        }
+
+        $violations = $this->validator->validate($transaction);
+        if (count($violations) > 0) {
+            throw new ValidationException($violations);
+        }
+
+        $rule = $data->rememberCategory ? $this->rememberCategory($transaction) : null;
+
+        $accounts = $this->savingMirrorLinker->link($transaction);
+
+        $result = $this->persistProcessor->process($transaction, $operation, $uriVariables, $context);
 
         if ($accounts) {
             foreach ($accounts as $account) {
                 $account->setBalance(
                     $this->transactionRepository->sumByAccount($account),
-                    $account->getBalanceCurrency() ?? $data->getCurrency(),
+                    $account->getBalanceCurrency() ?? $transaction->getCurrency(),
                     'computed',
                     new \DateTimeImmutable(),
                 );
@@ -47,6 +88,67 @@ final readonly class TransactionProcessor implements ProcessorInterface
             $this->entityManager->flush();
         }
 
+        // Rule flushed: the similar transactions are categorized in the background
+        if ($rule) {
+            $this->categorizer->requestOwnerCategorization($rule->getOwner());
+        }
+
         return $result;
+    }
+
+    /**
+     * All the splits are replaced (SavingMirrorLinker reads the previous ones from the collection snapshot);
+     * every split sent by the user is "manual".
+     */
+    private function replaceSplits(Transaction $transaction, UpdateTransaction $data): void
+    {
+        foreach ($transaction->getSplits()->toArray() as $split) {
+            $transaction->removeSplit($split);
+        }
+
+        foreach ($data->splits as $input) {
+            $transaction->addSplit(new TransactionSplit()
+                ->setCategory($input->category)
+                ->setAmount($input->amount)
+                ->setCounterpartAccount($input->counterpartAccount)
+                ->setCounterpartAmount($input->counterpartAmount));
+        }
+    }
+
+    /**
+     * Creates or updates the rule for the merchant key and the direction of the transaction (persisted, not flushed).
+     */
+    private function rememberCategory(Transaction $transaction): CategorizationRule
+    {
+        $splits = $transaction->getSplits();
+        $split = $splits->first();
+        $cents = Money::toCents($transaction->getAmount());
+
+        if (1 !== $splits->count() || null === $split->getCategory() || Money::toCents($split->getAmount()) !== $cents) {
+            throw new UnprocessableEntityHttpException('rememberCategory requires a single split of the whole amount, with a category.');
+        }
+
+        if (CategoryType::SAVING === $split->getCategory()->getType()) {
+            throw new UnprocessableEntityHttpException('A saving category cannot be remembered: its mirror needs a manual account.');
+        }
+
+        $account = $transaction->getAccount();
+        if (null === $transaction->getMerchantKey() || $account->isManual()) {
+            throw new UnprocessableEntityHttpException('This transaction has no merchant to remember (manual account or description without words).');
+        }
+
+        $owner = $account->getOwner();
+        $direction = TransactionDirection::fromCents($cents);
+        $rule = $this->ruleRepository->findOneSame($owner, $transaction->getMerchantKey(), $direction);
+
+        if (null === $rule) {
+            $rule = new CategorizationRule()
+                ->setOwner($owner)
+                ->setPattern($transaction->getMerchantKey())
+                ->setDirection($direction);
+            $this->entityManager->persist($rule);
+        }
+
+        return $rule->setCategory($split->getCategory());
     }
 }

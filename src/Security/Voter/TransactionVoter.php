@@ -94,7 +94,7 @@ final class TransactionVoter extends Voter
                     return false;
                 }
 
-                // After denormalization: the new splits can only use categories and accounts visible to the user
+                // Also called by TransactionProcessor once the new splits are mapped: they can only use categories and accounts visible to the user
                 foreach ($subject->getSplits() as $split) {
                     if($split->getCategory() && !$this->security->isGranted(CategoryVoter::READ, $split->getCategory())) {
                         $vote?->addReason('The user cannot use this category.');

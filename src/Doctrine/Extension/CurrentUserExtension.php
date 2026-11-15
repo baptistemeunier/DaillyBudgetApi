@@ -10,6 +10,7 @@ use ApiPlatform\Metadata\Operation;
 use App\Entity\Account;
 use App\Entity\AccountConnection;
 use App\Entity\Budget;
+use App\Entity\CategorizationRule;
 use App\Entity\Category;
 use App\Entity\Transaction;
 use Doctrine\ORM\QueryBuilder;
@@ -29,6 +30,7 @@ final readonly class CurrentUserExtension implements QueryCollectionExtensionInt
         AccountConnection::class => false,
         Account::class => false,
         Budget::class => false,
+        CategorizationRule::class => false,
         Category::class => true,
         Transaction::class => false,
     ];

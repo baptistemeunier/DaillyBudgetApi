@@ -11,7 +11,7 @@ use Symfony\Component\Serializer\Normalizer\NormalizerAwareTrait;
 use Symfony\Component\Serializer\Normalizer\NormalizerInterface;
 
 /**
- * Outputs the category and the saving counterpart (mirror transaction, its account) of a TransactionSplit as HAL links (see CategoryIriTrait).
+ * Outputs the category, the saving counterpart (mirror transaction, its account) and the categorization rule of a TransactionSplit as HAL links (see CategoryIriTrait).
  */
 #[AutoconfigureTag('serializer.normalizer', ['priority' => 64])]
 class TransactionSplitNormalizer implements NormalizerInterface, NormalizerAwareInterface
@@ -32,7 +32,7 @@ class TransactionSplitNormalizer implements NormalizerInterface, NormalizerAware
         }
 
         // Same as the categories: the counterpart is a HAL link, not an embedded transaction
-        $context[AbstractNormalizer::IGNORED_ATTRIBUTES] = [...$context[AbstractNormalizer::IGNORED_ATTRIBUTES] ?? [], 'counterpartTransaction'];
+        $context[AbstractNormalizer::IGNORED_ATTRIBUTES] = [...$context[AbstractNormalizer::IGNORED_ATTRIBUTES] ?? [], 'counterpartTransaction', 'rule'];
         $normalized = $this->normalizeWithCategoryIris($data, $format, $context, self::ALREADY_CALLED, ['category' => $data->getCategory()]);
 
         // Saving split: the mirror and its manual account (the account is not stored on the split)
@@ -43,6 +43,14 @@ class TransactionSplitNormalizer implements NormalizerInterface, NormalizerAware
             ];
             $normalized['_links']['counterpartAccount'] = [
                 'href' => $this->router->generate('_api_/accounts/{id}{._format}_get', ['id' => $counterpart->getAccount()->getId()]),
+            ];
+        }
+
+        // Split set by a categorization rule
+        $rule = $data->getRule();
+        if ($rule?->getId()) {
+            $normalized['_links']['rule'] = [
+                'href' => $this->router->generate('_api_/categorization_rules/{id}{._format}_get', ['id' => $rule->getId()]),
             ];
         }
 

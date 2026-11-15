@@ -31,3 +31,5 @@ Environment: real values live in `.env.dev.local` (not committed). Required: `DA
 The API logic is described in `docs/DESIGN.md`: authentication, authorization, the data model, endpoints, the bank connection and sync flows, and HAL links. Read it before changing resources, voters or the sync. Keep it up to date when that logic changes.
 
 @docs/DESIGN.md
+
+Automatic categorization (merchant key, categorization rules, split source) is described in `docs/AUTO_CATEGORIZATION.md`. Keep it up to date when that logic changes.

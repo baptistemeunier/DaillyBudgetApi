@@ -9,6 +9,7 @@ use App\Entity\User;
 use App\Enum\AccountType;
 use App\Enum\CategoryType;
 use App\Enum\Currency;
+use App\Enum\SplitSource;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\ORM\QueryBuilder;
 use Doctrine\Persistence\ManagerRegistry;
@@ -52,6 +53,58 @@ class TransactionRepository extends ServiceEntityRepository
             ->setParameter('owner', $owner->getId(), UuidType::NAME)
             ->getQuery()
             ->getSingleScalarResult();
+    }
+
+    /**
+     * Transactions of the user categorized by a rule (at least one split with source "rule"), not yet reviewed.
+     */
+    public function countAutoCategorized(User $owner): int
+    {
+        return (int) $this->createQueryBuilder('t')
+            ->select('COUNT(t.id)')
+            ->join('t.account', 'a')
+            ->andWhere('a.owner = :owner')
+            ->andWhere('a.deletedAt IS NULL')
+            ->andWhere(self::autoCategorizedCondition('t', 'auto_source'))
+            ->setParameter('owner', $owner->getId(), UuidType::NAME)
+            ->setParameter('auto_source', SplitSource::RULE)
+            ->getQuery()
+            ->getSingleScalarResult();
+    }
+
+    /**
+     * DQL condition: the transaction has a split set by a rule. $parameter must be bound to SplitSource::RULE.
+     */
+    public static function autoCategorizedCondition(string $alias, string $parameter): string
+    {
+        return sprintf(
+            'EXISTS (SELECT auto_split.id FROM %2$s auto_split WHERE auto_split.transaction = %1$s AND auto_split.source = :%3$s)',
+            $alias,
+            TransactionSplit::class,
+            $parameter,
+        );
+    }
+
+    /**
+     * Transactions of the account with a merchant key and without split set by the user, with their splits.
+     *
+     * @return Transaction[]
+     */
+    public function findCategorizableByAccount(Account $account): array
+    {
+        return $this->createQueryBuilder('t')
+            ->addSelect('s')
+            ->leftJoin('t.splits', 's')
+            ->andWhere('t.account = :account')
+            ->andWhere('t.merchantKey IS NOT NULL')
+            ->andWhere(sprintf(
+                'NOT EXISTS (SELECT manual_split.id FROM %s manual_split WHERE manual_split.transaction = t AND manual_split.source = :manual)',
+                TransactionSplit::class,
+            ))
+            ->setParameter('account', $account->getId(), UuidType::NAME)
+            ->setParameter('manual', SplitSource::MANUAL)
+            ->getQuery()
+            ->getResult();
     }
 
     /**

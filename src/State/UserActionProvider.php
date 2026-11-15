@@ -58,6 +58,13 @@ readonly class UserActionProvider implements ProviderInterface
                 $action->count = $count;
                 $actions[] = $action;
             }
+
+            $count = $this->transactionRepository->countAutoCategorized($user);
+            if ($count > 0) {
+                $action = new UserAction(UserActionType::TRANSACTIONS_TO_REVIEW, UserActionType::TRANSACTIONS_TO_REVIEW->value);
+                $action->count = $count;
+                $actions[] = $action;
+            }
         }
 
         // Highest priority first, then the soonest expiry

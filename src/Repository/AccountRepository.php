@@ -48,6 +48,22 @@ class AccountRepository extends ServiceEntityRepository
             ->getResult();
     }
 
+    /**
+     * Active accounts of the user synced with a bank (not manual).
+     *
+     * @return Account[]
+     */
+    public function findSyncedByOwner(User $owner): array
+    {
+        return $this->createQueryBuilder('a')
+            ->andWhere('a.owner = :owner')
+            ->andWhere('a.deletedAt IS NULL')
+            ->andWhere('a.externalId IS NOT NULL')
+            ->setParameter('owner', $owner->getId(), UuidType::NAME)
+            ->getQuery()
+            ->getResult();
+    }
+
 //    /**
 //     * @return Account[] Returns an array of Account objects
 //     */
