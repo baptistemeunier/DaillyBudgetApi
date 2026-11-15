@@ -11,8 +11,8 @@ Le but : que le front ne retélécharge pas les ressources qui changent peu.
 | Ressource | `Cache-Control` | Raison |
 |---|---|---|
 | `Bank` | `max-age=3600, private` | Liste déjà mise en cache 24 h côté serveur (`BankProvider::CACHE_TTL`) |
-| `Category`, `Budget`, `CategorizationRule` | `max-age=0, must-revalidate, private` | Changent peu, mais doivent être à jour juste après un PATCH : revalidation systématique via l'ETag |
-| Le reste (transactions, relevés, syncs, actions) | ETag seul | Volatiles |
+| `Category`, `Budget`, `CategorizationRule`, `NotificationSettings` | `max-age=0, must-revalidate, private` | Changent peu, mais doivent être à jour juste après un PATCH : revalidation systématique via l'ETag |
+| Le reste (transactions, relevés, syncs, actions, notifications, abonnements push) | ETag seul | Volatiles |
 
 Pour rendre une autre ressource cacheable, ajoutez `cacheHeaders` sur son `#[ApiResource]`. Ce réglage ne s'applique qu'aux méthodes GET et HEAD.
 

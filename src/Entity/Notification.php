@@ -150,6 +150,14 @@ class Notification
         return $this->data;
     }
 
+    /**
+     * Id of the subject (account, connection, transaction or category), or of the owner when there is none.
+     */
+    public function getSubjectId(): ?Uuid
+    {
+        return ($this->account ?? $this->accountConnection ?? $this->transaction ?? $this->category ?? $this->owner)?->getId();
+    }
+
     public function getDedupKey(): ?string
     {
         return $this->dedupKey;

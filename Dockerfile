@@ -4,7 +4,7 @@
 
 FROM docker.io/dunglas/frankenphp:1-php8.4-alpine AS base
 
-RUN install-php-extensions pdo_mysql intl opcache apcu \
+RUN install-php-extensions pdo_mysql intl opcache apcu gmp \
  && rm -rf /tmp/* /var/cache/apk/*
 
 COPY --from=docker.io/composer/composer:2-bin /composer /usr/bin/composer

@@ -17,15 +17,16 @@ docker compose up -d database                 # PostgreSQL 16 (only service in c
 symfony serve  # or: php -S localhost:8000 -t public
 bin/console doctrine:migrations:diff          # generate a migration after changing entities
 bin/console doctrine:migrations:migrate
-bin/console messenger:consume async scheduler_default -vv  # run the worker: account syncs, notifications and the scheduled tasks
+bin/console messenger:consume async push scheduler_default -vv  # run the worker: account syncs, notifications, Web Push deliveries and the scheduled tasks
 bin/console app:notifications:daily          # run the daily notification task now (then consume async)
+bin/console app:notifications:test-push [user] [--type=MONTH_CLOSING] # list the push devices, or send a test push (or a sample notification of a type) to a user's devices; synchronous, prints the push service answer
 bin/console debug:router                      # list API routes (API Platform route names: _api_/<path>{._format}_<op>)
 bin/console cache:clear
 ```
 
 There is no test suite, PHPUnit, linter or static analyser installed yet.
 
-Environment: real values live in `.env.dev.local` (not committed). Required: `DATABASE_URL`, `OAUTH2_CONFIGURATION_URL` (OIDC discovery URL), `OAUTH2_CLIENT_ID`, `GOCARDLESS_BASE_URL` (not declared in `.env`), `GOCARDLESS_CLIENT_ID`, `GOCARDLESS_CLIENT_SECRET`, `MESSENGER_TRANSPORT_DSN` (Doctrine transport, `auto_setup=0`, so the messenger table comes from migrations).
+Environment: real values live in `.env.dev.local` (not committed). Required: `DATABASE_URL`, `OAUTH2_CONFIGURATION_URL` (OIDC discovery URL), `OAUTH2_CLIENT_ID`, `GOCARDLESS_BASE_URL` (not declared in `.env`), `GOCARDLESS_CLIENT_ID`, `GOCARDLESS_CLIENT_SECRET`, `MESSENGER_TRANSPORT_DSN` (Doctrine transport, `auto_setup=0`, so the messenger table comes from migrations), `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` (Web Push; only needed to send pushes).
 
 ## Architecture
 
@@ -37,4 +38,4 @@ HTTP caching (ETag / 304, per-resource `Cache-Control`) is described in `docs/HT
 
 Automatic categorization (merchant key, categorization rules, split source) is described in `docs/AUTO_CATEGORIZATION.md`. Keep it up to date when that logic changes.
 
-Notifications (inbox, `Notifier` and deduplication key, push subscriptions, settings, daily scheduled task) are described in `docs/NOTIFICATIONS.md`. Keep it up to date when that logic changes.
+Notifications (inbox, `Notifier` and deduplication key, push subscriptions, settings, Web Push sending, daily scheduled task) are described in `docs/NOTIFICATIONS.md`. Keep it up to date when that logic changes.

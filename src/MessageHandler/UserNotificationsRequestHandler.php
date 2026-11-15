@@ -11,6 +11,7 @@ use App\Notification\Notifier;
 use App\Repository\AccountConnectionRepository;
 use App\Repository\TransactionRepository;
 use App\Repository\UserRepository;
+use App\Service\BankNameResolver;
 use App\Service\ConnectionStatusResolver;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
@@ -33,6 +34,7 @@ final readonly class UserNotificationsRequestHandler
         private AccountConnectionRepository $accountConnectionRepository,
         private TransactionRepository $transactionRepository,
         private ConnectionStatusResolver $connectionStatusResolver,
+        private BankNameResolver $bankNameResolver,
         private Notifier $notifier,
         private LoggerInterface $logger,
     ) {
@@ -60,13 +62,20 @@ final readonly class UserNotificationsRequestHandler
 
     private function notifyConnection(User $user, AccountConnection $connection, \DateTimeImmutable $now): void
     {
+        $type = $this->connectionStatusResolver->resolve($connection, $now);
+        if (null === $type) {
+            return;
+        }
+
+        // The bank name is stored: the service worker writes the push text without calling the API
         $expiresAt = $connection->getAccessExpiresAt();
         $data = [
             'bankId' => $connection->getBankId(),
+            'bankName' => $this->bankNameResolver->resolve($connection->getBankId()),
             'expiresAt' => $expiresAt?->format(\DateTimeInterface::ATOM),
         ];
 
-        switch ($this->connectionStatusResolver->resolve($connection, $now)) {
+        switch ($type) {
             case UserActionType::CONNECTION_EXPIRED:
                 $type = NotificationType::CONNECTION_EXPIRED;
                 $this->notifier->notify($user, $type, $connection, $data, $type->dedupKey($connection->getId()));

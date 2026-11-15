@@ -9,11 +9,13 @@ use App\Entity\Notification;
 use App\Entity\Transaction;
 use App\Entity\User;
 use App\Enum\NotificationType;
+use App\Message\SendPushNotification;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Bridge\Doctrine\Types\UuidType;
+use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Uid\Uuid;
 
 /**
@@ -22,12 +24,14 @@ use Symfony\Component\Uid\Uuid;
  * The (owner, dedupKey) pair is unique: a notification already sent is never created again, so a handler or a
  * scheduled task can be replayed without duplicate. Inserted through DBAL so that a duplicate (unique constraint
  * violation) does not close the EntityManager of the caller.
+ * A notification created is then pushed asynchronously (SendPushNotification), if the user enabled its type.
  */
 final readonly class Notifier
 {
     public function __construct(
         private EntityManagerInterface $entityManager,
         private LoggerInterface $logger,
+        private MessageBusInterface $bus,
     ) {
     }
 
@@ -90,6 +94,8 @@ final readonly class Notifier
             'type' => $type->value,
             'dedup_key' => $dedupKey,
         ]);
+
+        $this->bus->dispatch(new SendPushNotification($id));
 
         return true;
     }

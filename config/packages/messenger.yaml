@@ -24,6 +24,15 @@ framework:
                     # override the entire retry strategy with a custom service that
                     # implements Symfony\Component\Messenger\Retry\RetryStrategyInterface
                     # service: null
+            # Web Push deliveries (DeliverPush), one message per device: retried on a push service error
+            push:
+                dsn: '%env(MESSENGER_TRANSPORT_DSN)%'
+                options:
+                    queue_name: push
+                retry_strategy:
+                    max_retries: 3
+                    delay: 60000
+                    multiplier: 4
             # failed: 'doctrine://default?queue_name=failed'
             sync: 'sync://'
 
