@@ -4,6 +4,8 @@ namespace App\Repository;
 
 use App\Entity\Account;
 use App\Entity\User;
+use App\Enum\AccountStatus;
+use App\Enum\RequisitionStatus;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 use Symfony\Bridge\Doctrine\Types\UuidType;
@@ -60,6 +62,30 @@ class AccountRepository extends ServiceEntityRepository
             ->andWhere('a.deletedAt IS NULL')
             ->andWhere('a.externalId IS NOT NULL')
             ->setParameter('owner', $owner->getId(), UuidType::NAME)
+            ->getQuery()
+            ->getResult();
+    }
+
+    /**
+     * Accounts the periodic sync can refresh: synced with a bank (not manual), not deleted, not expired at the bank,
+     * on a non-deleted connection that is linked and whose access has not expired.
+     * Accounts with a synchronization queued or running are left to it (see AccountSyncRepository).
+     *
+     * @return Account[]
+     */
+    public function findSyncable(\DateTimeImmutable $now = new \DateTimeImmutable()): array
+    {
+        return $this->createQueryBuilder('a')
+            ->join('a.accountConnection', 'c')
+            ->andWhere('a.deletedAt IS NULL')
+            ->andWhere('a.externalId IS NOT NULL')
+            ->andWhere('a.externalStatus IS NULL OR a.externalStatus <> :expired_account')
+            ->andWhere('c.deletedAt IS NULL')
+            ->andWhere('c.externalStatus = :linked')
+            ->andWhere('c.accessExpiresAt IS NULL OR c.accessExpiresAt > :now')
+            ->setParameter('expired_account', AccountStatus::EXPIRED)
+            ->setParameter('linked', RequisitionStatus::LINKED)
+            ->setParameter('now', $now)
             ->getQuery()
             ->getResult();
     }

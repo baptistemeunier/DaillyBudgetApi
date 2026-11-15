@@ -49,7 +49,7 @@ final readonly class TestPushCommand
         ?string $user = null,
         #[Option(description: 'Uuid of a single push subscription to target')]
         ?string $device = null,
-        #[Option(description: 'Notification type to simulate (CONNECTION_EXPIRING, CONNECTION_EXPIRED, CONNECTION_TO_CONFIGURE, MONTH_CLOSING); omitted: a "TEST" push with --title and --body')]
+        #[Option(description: 'Notification type to simulate (a NotificationType, e.g. MONTH_CLOSING, BALANCE_LOW, BUDGET_EXCEEDED); omitted: a "TEST" push with --title and --body')]
         ?string $type = null,
         #[Option(description: 'With --type: ask the service worker to leave the amounts out')]
         bool $hideAmounts = false,
@@ -106,7 +106,7 @@ final readonly class TestPushCommand
                     $this->sampleData($notificationType),
                     (string) $subscription->getLocale(),
                     $hideAmounts,
-                    PushMessageFactory::path($notificationType),
+                    PushMessageFactory::path($notificationType, $this->sampleData($notificationType)['accountId'] ?? null),
                     sprintf('%s:test', $notificationType->value),
                     null,
                 );
@@ -140,12 +140,20 @@ final readonly class TestPushCommand
     {
         $now = new \DateTimeImmutable('now', new \DateTimeZone('UTC'));
         $bank = ['bankId' => 'SANDBOXFINANCE_SFIN0000', 'bankName' => 'Sandbox Finance'];
+        $account = ['accountId' => '00000000-0000-0000-0000-000000000000', 'accountName' => 'Compte courant'];
+        $transaction = ['currency' => 'EUR', 'bookingAt' => $now->format('Y-m-d')];
+        $budget = ['month' => $now->format('Y-m'), 'budgeted' => '400.00', 'currency' => 'EUR', 'categoryCode' => 'food', 'categoryName' => null];
 
         return match ($type) {
             NotificationType::CONNECTION_EXPIRING => $bank + ['expiresAt' => $now->modify('+3 days')->format(\DateTimeInterface::ATOM), 'daysLeft' => 3],
             NotificationType::CONNECTION_EXPIRED => $bank + ['expiresAt' => $now->modify('-1 day')->format(\DateTimeInterface::ATOM)],
             NotificationType::CONNECTION_TO_CONFIGURE => $bank,
             NotificationType::MONTH_CLOSING => ['count' => 8, 'month' => $now->format('Y-m'), 'daysLeft' => 5],
+            NotificationType::BALANCE_LOW => $account + ['balance' => '87.40', 'threshold' => '150.00', 'currency' => 'EUR'],
+            NotificationType::LARGE_TRANSACTION => $account + $transaction + ['amount' => '-249.99', 'description' => 'FNAC PARIS'],
+            NotificationType::INCOME_RECEIVED => $account + $transaction + ['amount' => '2150.00', 'description' => 'VIR SALAIRE', 'categoryCode' => 'income.salary', 'categoryName' => null],
+            NotificationType::BUDGET_ALMOST_EXCEEDED => $budget + ['spent' => '330.00', 'percent' => 82],
+            NotificationType::BUDGET_EXCEEDED => $budget + ['spent' => '432.50', 'percent' => 108],
         };
     }
 

@@ -3,6 +3,7 @@
 namespace App\MessageHandler;
 
 use App\Message\AccountCategorizationRequest;
+use App\Notification\CategoryAlerts;
 use App\Repository\AccountRepository;
 use App\Repository\CategorizationRuleRepository;
 use App\Repository\TransactionRepository;
@@ -24,6 +25,7 @@ final readonly class AccountCategorizationRequestHandler
         private TransactionRepository $transactionRepository,
         private TransactionCategorizer $categorizer,
         private EntityManagerInterface $entityManager,
+        private CategoryAlerts $categoryAlerts,
         private LoggerInterface $logger,
     ) {
     }
@@ -41,19 +43,27 @@ final readonly class AccountCategorizationRequestHandler
             return;
         }
 
+        // Without rules nothing is categorized, hence no category alert either
         $rules = $this->ruleRepository->findByOwner($owner);
         if (!$rules) {
             return;
         }
 
-        $count = 0;
+        $categorized = [];
         foreach ($this->transactionRepository->findCategorizableByAccount($account) as $transaction) {
             if ($this->categorizer->categorize($transaction, $rules)) {
-                ++$count;
+                $categorized[] = $transaction;
             }
         }
+        $count = count($categorized);
 
         $this->entityManager->flush();
+
+        // After a sync: INCOME_RECEIVED and BUDGET_* on what the rules just categorized (after the flush: the
+        // budget sums are read from the database)
+        if ($message->withAlerts()) {
+            $this->categoryAlerts->notify($owner, $account, $categorized);
+        }
 
         $this->logger->info('Account categorization completed.', [
             'account_id' => $message->getId()->toRfc4122(),

@@ -25,24 +25,28 @@ class AccountSyncRepository extends ServiceEntityRepository
     }
 
     /**
-     * Accounts of the connection that have a synchronization queued or running.
+     * Accounts (of the connection, or of every connection) that have a synchronization queued or running.
      *
      * @return Account[]
      */
-    public function findAccountsWithOngoingSync(AccountConnection $accountConnection): array
+    public function findAccountsWithOngoingSync(?AccountConnection $accountConnection = null): array
     {
-        return $this->getEntityManager()->createQueryBuilder()
+        $qb = $this->getEntityManager()->createQueryBuilder()
             ->select('a')
             ->from(Account::class, 'a')
-            ->andWhere('a.accountConnection = :accountConnection')
             ->andWhere(sprintf(
                 'EXISTS (SELECT s.id FROM %s s WHERE s.account = a AND s.status IN (:statuses))',
                 AccountSync::class,
             ))
-            ->setParameter('accountConnection', $accountConnection->getId(), UuidType::NAME)
-            ->setParameter('statuses', [AccountSyncStatus::PENDING, AccountSyncStatus::IN_PROGRESS])
-            ->getQuery()
-            ->getResult();
+            ->setParameter('statuses', [AccountSyncStatus::PENDING, AccountSyncStatus::IN_PROGRESS]);
+
+        if (null !== $accountConnection) {
+            $qb
+                ->andWhere('a.accountConnection = :accountConnection')
+                ->setParameter('accountConnection', $accountConnection->getId(), UuidType::NAME);
+        }
+
+        return $qb->getQuery()->getResult();
     }
 
     /**

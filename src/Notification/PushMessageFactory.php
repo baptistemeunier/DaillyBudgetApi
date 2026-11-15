@@ -53,14 +53,21 @@ final readonly class PushMessageFactory
 
     /**
      * Page of the app opened on tap for a type (CONNECTION_TO_CONFIGURE opens the consent link when known).
+     * Account alerts open the account, on the transaction when there is a single one.
      */
-    public static function path(NotificationType $type): string
+    public static function path(NotificationType $type, ?string $accountId = null, ?string $transactionId = null): string
     {
         return match ($type) {
             NotificationType::CONNECTION_EXPIRING,
             NotificationType::CONNECTION_EXPIRED,
             NotificationType::CONNECTION_TO_CONFIGURE => '/profile/connections',
             NotificationType::MONTH_CLOSING => '/transactions/to-categorize',
+            NotificationType::BALANCE_LOW,
+            NotificationType::LARGE_TRANSACTION,
+            NotificationType::INCOME_RECEIVED => null === $accountId ? '/' : sprintf('/accounts/%s', $accountId)
+                . (null !== $transactionId ? sprintf('?transaction=%s', $transactionId) : ''),
+            NotificationType::BUDGET_ALMOST_EXCEEDED,
+            NotificationType::BUDGET_EXCEEDED => '/budget',
         };
     }
 
@@ -94,10 +101,14 @@ final readonly class PushMessageFactory
      */
     private function url(Notification $notification): string
     {
-        $path = NotificationType::CONNECTION_TO_CONFIGURE === $notification->getType()
+        $type = $notification->getType();
+        $transaction = $notification->getTransaction();
+        $accountId = ($notification->getAccount() ?? $transaction?->getAccount())?->getId()?->toRfc4122();
+
+        $path = NotificationType::CONNECTION_TO_CONFIGURE === $type
             // The consent page of the bank (outside the app): the front cannot mark it as read on opening
-            ? $notification->getAccountConnection()?->getExternalLink() ?? self::path($notification->getType())
-            : self::path($notification->getType());
+            ? $notification->getAccountConnection()?->getExternalLink() ?? self::path($type)
+            : self::path($type, $accountId, $transaction?->getId()?->toRfc4122());
 
         if (!str_starts_with($path, '/')) {
             return $path;

@@ -1,6 +1,6 @@
 # Notifications (API)
 
-La proposition complète (catalogue, anti-spam, Web Push, front) est dans `daily-budget-front/docs/NOTIFICATIONS.md`. Ce document décrit ce qui est **implémenté côté API** : les étapes 1 et 2 : le socle, la boîte de notifications, la tâche quotidienne, les préférences (`NotificationSettings`) et l'envoi Web Push.
+La proposition complète (catalogue, anti-spam, Web Push, front) est dans `daily-budget-front/docs/NOTIFICATIONS.md`. Ce document décrit ce qui est **implémenté côté API** : les étapes 1 à 3 : le socle, la boîte de notifications, la tâche quotidienne, les préférences (`NotificationSettings`), l'envoi Web Push, la sync périodique et les alertes qui la suivent.
 
 Une notification est un **événement daté** (« ça vient d'arriver »). Une `UserAction` est un **état**, calculé à la demande. Les deux coexistent.
 
@@ -9,9 +9,14 @@ Une notification est un **événement daté** (« ça vient d'arriver »). Une `
 | Type | Sujet | Déclencheur | Clé de dédoublonnage | `data` |
 |---|---|---|---|---|
 | `CONNECTION_EXPIRING` | `accountConnection` | Tâche quotidienne : l'accès expire dans 7 jours ou moins, puis dans 1 jour ou moins | `CONNECTION_EXPIRING_{connection}_7D`, `…_1D` | `bankId`, `bankName`, `expiresAt`, `daysLeft` |
-| `CONNECTION_EXPIRED` | `accountConnection` | Tâche quotidienne : accès expiré ou suspendu | `CONNECTION_EXPIRED_{connection}` | `bankId`, `bankName`, `expiresAt` |
+| `CONNECTION_EXPIRED` | `accountConnection` | Tâche quotidienne : accès expiré ou suspendu. Ou tout de suite, quand la banque refuse une sync (`AccountAlertsRequestHandler`) | `CONNECTION_EXPIRED_{connection}` | `bankId`, `bankName`, `expiresAt` |
 | `CONNECTION_TO_CONFIGURE` | `accountConnection` | Tâche quotidienne : connexion toujours sans consentement 24 h après sa création | `CONNECTION_TO_CONFIGURE_{connection}` | `bankId`, `bankName` |
 | `MONTH_CLOSING` | aucun | Tâche quotidienne : il reste 1 à 5 jours dans le mois (UTC) et des transactions du mois à catégoriser | `MONTH_CLOSING_{user}_{YYYY-MM}` | `count`, `month`, `daysLeft` |
+| `BALANCE_LOW` | `account` | Après une sync : le solde d'un compte courant passe sous `lowBalanceThreshold` | `BALANCE_LOW_{account}_{YYYY-MM-DD}` | `accountId`, `accountName`, `balance`, `threshold`, `currency` |
+| `LARGE_TRANSACTION` | `transaction`, ou `account` si regroupées | Après une sync : nouveau débit d'au moins `largeTransactionThreshold` | `LARGE_TRANSACTION_{transaction}`, regroupées `LARGE_TRANSACTION_{account}_{sync}` | `accountId`, `accountName`, `currency`, puis `amount`, `description`, `bookingAt`, ou, regroupées, `count`, `total` |
+| `INCOME_RECEIVED` | `transaction`, ou `account` si regroupées | Après la catégorisation qui suit une sync : nouveau crédit dans une catégorie de type `income`. Pas de push par défaut | `INCOME_RECEIVED_{transaction}`, regroupées `INCOME_RECEIVED_{account}_{date et heure}` | comme `LARGE_TRANSACTION`, + `categoryCode`, `categoryName` |
+| `BUDGET_ALMOST_EXCEEDED` | `category` (racine) | Après la catégorisation qui suit une sync : le dépensé du mois atteint 80 % de la ligne de budget | `BUDGET_ALMOST_EXCEEDED_{category}_{YYYY-MM}` | `month`, `spent`, `budgeted`, `percent`, `currency`, `categoryCode`, `categoryName` |
+| `BUDGET_EXCEEDED` | `category` (racine) | Idem, le dépensé dépasse la ligne de budget | `BUDGET_EXCEEDED_{category}_{YYYY-MM}` | idem |
 
 `bankName` est résolu à la création, avec la liste des banques en cache (`App\Service\BankNameResolver`). Il vaut `null` si la liste est indisponible : le front affiche alors `bankId`. Il est stocké parce que le service worker rédige le push sans appeler l'API.
 
@@ -19,7 +24,7 @@ L'état d'une connexion est calculé par `App\Service\ConnectionStatusResolver`,
 
 La fenêtre de `MONTH_CLOSING` (1 à 5 jours) rattrape un passage manqué le lendemain. La clé mensuelle garantit un seul envoi.
 
-`CONNECTION_EXPIRED` n'est pas encore envoyée quand la banque refuse une sync : ce sera fait à l'étape 3 (`AccountAlertsRequest`). Pour l'instant, la tâche du lendemain la détecte.
+Les montants sont des décimaux en chaîne, signés comme les transactions (débit négatif). `categoryCode` est le code d'une catégorie système (`food`, `income.salary`…), `categoryName` le nom d'une catégorie de l'utilisateur.
 
 ## Modèle
 
@@ -56,19 +61,19 @@ Un abonnement Web Push par appareil ou navigateur. Voir [Web Push](#web-push) po
 
 ### `NotificationSettings`
 
-Les préférences : une ressource **par utilisateur**, sur le modèle de `Budget` (la collection contient 0 ou 1 élément). Elle est créée au premier réglage modifié. `push` et `hideAmounts` sont lus par l'envoi des pushes. `largeTransactionThreshold` servira aux alertes (étape 3).
+Les préférences : une ressource **par utilisateur**, sur le modèle de `Budget` (la collection contient 0 ou 1 élément). Elle est créée au premier réglage modifié. `push` et `hideAmounts` sont lus par l'envoi des pushes. `largeTransactionThreshold` sert à `LARGE_TRANSACTION`.
 
 | Champ | Note |
 |---|---|
 | `push` | Lecture : chaque type → `true`/`false`, avec le choix de l'utilisateur ou, à défaut, `NotificationType::defaultPush()`. Écriture : seuls les types envoyés changent (fusion). Un type inconnu ou une valeur non booléenne donne une 422 |
-| `largeTransactionThreshold` | Décimal, `200.00` par défaut. Pour `LARGE_TRANSACTION` (étape 3) |
+| `largeTransactionThreshold` | Décimal, `200.00` par défaut. Seuil de `LARGE_TRANSACTION` |
 | `hideAmounts` | `false` par défaut. Transmis dans le push : le service worker garde alors les montants hors du texte |
 
 Stockage : `push` en json, avec seulement les types modifiés. Les deux autres sont des colonnes typées. La notification dans l'app est toujours créée : la préférence ne coupe que le push. Sans ressource, `NotificationSettingsRepository::findOrDefault()` renvoie les valeurs par défaut.
 
 ### Seuil de solde bas (`Account.lowBalanceThreshold`)
 
-Il n'est pas dans `NotificationSettings` : il est propre à chaque compte. C'est un décimal nullable, éventuellement négatif (découvert). `null`, la valeur par défaut, veut dire que le compte n'envoie jamais `BALANCE_LOW`. Il n'y a ni valeur globale ni valeur par défaut. Il ne sert qu'aux comptes courants. Il est enregistré dès maintenant, mais `BALANCE_LOW` n'arrive qu'à l'étape 3.
+Il n'est pas dans `NotificationSettings` : il est propre à chaque compte. C'est un décimal nullable, éventuellement négatif (découvert). `null`, la valeur par défaut, veut dire que le compte n'envoie jamais `BALANCE_LOW`. Il n'y a ni valeur globale ni valeur par défaut. Il ne sert qu'aux comptes courants. Voir [Sync périodique et alertes](#sync-périodique-et-alertes).
 
 ## Endpoints
 
@@ -153,13 +158,43 @@ Notifier ─▶ SendPushNotification (async) ─▶ SendPushNotificationHandler
 - **Le texte n'est pas rédigé par l'API.** Le service worker le compose avec l'i18n du front, à partir de `type` et `data`, avec les mêmes clés que la boîte de notifications (`notifications.<TYPE>.title|body`). Les textes vivent ainsi à un seul endroit. Il doit prévoir un texte générique pour un type qu'il ne connaît pas (ancien service worker encore en cache).
 - **`locale`** : la langue de l'abonnement (`fr` par défaut), dans laquelle le service worker rédige le push.
 - **`data`** : les mêmes données que la notification (`GET /notifications/{id}`). Les dates et les mois sont formatés par le service worker (`Intl`).
-- **`hideAmounts`** : le service worker garde les montants hors du titre et du corps, qui s'affichent sur l'écran verrouillé. Aucun type actuel ne contient de montant.
+- **`hideAmounts`** : le service worker garde les montants (`amount`, `total`, `balance`, `spent`…) hors du titre et du corps, qui s'affichent sur l'écran verrouillé.
 - **`url`** : la page ouverte au tap, avec `?notification={id}` pour que le front marque la notification comme lue :
   - `/profile/connections` pour `CONNECTION_EXPIRING` et `CONNECTION_EXPIRED` ;
   - le lien de consentement de la banque pour `CONNECTION_TO_CONFIGURE`, une page externe, donc sans marquage ;
-  - `/transactions/to-categorize` pour `MONTH_CLOSING`.
+  - `/transactions/to-categorize` pour `MONTH_CLOSING` ;
+  - `/accounts/{account}` pour `BALANCE_LOW` et les notifications regroupées, `/accounts/{account}?transaction={id}` pour une seule transaction ;
+  - `/budget` pour `BUDGET_*`.
 - **`tag`** : `{TYPE}:{sujet}` (`{TYPE}:{mois}` pour `MONTH_CLOSING`). Le service worker le passe à `showNotification`, qui remplace la notification affichée du même sujet.
 
-## Pas encore implémenté
+## Sync périodique et alertes
 
-- **Étape 3, sync périodique et alertes** : `SyncAllAccountsMessage`, `AccountAlertsRequest`, `BALANCE_LOW` (le seuil `Account.lowBalanceThreshold` existe déjà), `LARGE_TRANSACTION`, `INCOME_RECEIVED`, `BUDGET_ALMOST_EXCEEDED`, `BUDGET_EXCEEDED`, regroupement par sync.
+```
+Scheduler (6 h et 18 h UTC) ─▶ SyncAllAccountsMessage ─▶ AccountSync + AccountSyncRequest par compte synchronisable
+AccountSyncRequestHandler
+  ├─ succès ─▶ AccountAlertsRequest(sync, solde d'avant)              ─▶ BALANCE_LOW, LARGE_TRANSACTION
+  │        └─▶ AccountCategorizationRequest(compte, alerts: true)     ─▶ règles, puis INCOME_RECEIVED, BUDGET_*
+  └─ refus de la banque (ACCESS_EXPIRED) ─▶ AccountAlertsRequest       ─▶ CONNECTION_EXPIRED
+```
+
+- **Sync périodique** (`SyncAllAccountsMessageHandler`) : deux fois par jour, pour chaque compte synchronisable (`AccountRepository::findSyncable()`) :
+  - un compte bancaire non supprimé, pas `EXPIRED` chez la banque ;
+  - sur une connexion non supprimée, `LINKED`, dont l'accès n'a pas expiré ;
+  - sans sync déjà en attente ou en cours.
+
+  Le quota GoCardless (4 syncs par compte sur 24 h) reste appliqué par `AccountSyncRequestHandler` : deux syncs planifiées laissent de la place aux syncs manuelles.
+- **Deux handlers après la sync** :
+  - `AccountAlertsRequestHandler` reçoit le solde d'avant la sync dans le message (pas de colonne en base). Il gère les alertes qui n'ont pas besoin des catégories.
+  - Les alertes sur les catégories suivent la catégorisation, pour voir les catégories posées par les règles. `AccountCategorizationRequest` a un booléen `alerts`. Il vaut `false` quand la catégorisation suit une modification des règles : pas d'alerte dans ce cas.
+- **Première sync d'un compte** : aucune alerte. Elle importe des mois d'historique.
+- **Nouvelles transactions** : celles créées pendant la sync (`createdAt`), comptabilisées depuis 7 jours au plus (`TransactionNotifier::NEW_TRANSACTION_DAYS`). La sync remonte 5 jours en arrière et peut ramener des transactions anciennes.
+- **`BALANCE_LOW`** : seulement au franchissement du seuil (solde d'avant ≥ seuil > solde d'après), sur un compte courant qui a un `lowBalanceThreshold`. Un solde qui reste bas n'envoie rien. La date dans la clé limite à une notification par jour.
+- **Regroupement** (`TransactionNotifier`) : jusqu'à 3 transactions trouvées ensemble, une notification par transaction. Au-delà, une seule notification regroupée sur le compte (`count`, `total`).
+- **`INCOME_RECEIVED`** : crédits que les règles viennent de catégoriser dans une catégorie de type `income` (ou sous-catégorie). Une transaction catégorisée à la main n'envoie rien.
+- **`BUDGET_*`** (`CategoryAlerts`), seulement pour un compte courant et si l'utilisateur a un budget :
+  - les catégories racines `expense` touchées par les transactions du mois que les règles viennent de catégoriser ;
+  - le dépensé du mois (UTC, même requête que le relevé, `sumSplitsByRootCategory`) est comparé à la `BudgetLine` :
+    - au-delà de 100 % : `BUDGET_EXCEEDED` ;
+    - à partir de 80 % : `BUDGET_ALMOST_EXCEEDED`, sauf si `BUDGET_EXCEEDED` a déjà été envoyée ce mois-ci pour la catégorie (dans le cas d'un remboursement, par exemple).
+  - Chacune part au plus une fois par catégorie et par mois.
+  - Un dépassement causé par une catégorisation manuelle n'envoie rien sur le moment : il est signalé à la sync suivante s'il dure toujours et que de nouvelles transactions touchent la catégorie.

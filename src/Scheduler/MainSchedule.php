@@ -3,6 +3,7 @@
 namespace App\Scheduler;
 
 use App\Message\DailyNotificationsMessage;
+use App\Message\SyncAllAccountsMessage;
 use Symfony\Component\Lock\LockFactory;
 use Symfony\Component\Scheduler\Attribute\AsSchedule;
 use Symfony\Component\Scheduler\RecurringMessage;
@@ -27,6 +28,8 @@ final readonly class MainSchedule implements ScheduleProviderInterface
     {
         return new Schedule()
             ->add(RecurringMessage::cron('0 8 * * *', new DailyNotificationsMessage()))
+            // Periodic sync, then the alerts: twice a day leaves room for manual syncs in the GoCardless quota (4 / 24 h)
+            ->add(RecurringMessage::cron('0 6,18 * * *', new SyncAllAccountsMessage()))
             // Survives a worker restart without running a missed tick twice
             ->stateful($this->cache)
             // After a long downtime, only the last missed run of each task is caught up

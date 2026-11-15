@@ -116,6 +116,32 @@ class TransactionRepository extends ServiceEntityRepository
     }
 
     /**
+     * Transactions of the account created (imported) in [$from, $to], i.e. brought by a synchronization,
+     * booked since $bookedSince. With their splits and categories.
+     *
+     * @return Transaction[]
+     */
+    public function findCreatedDuring(Account $account, \DateTimeImmutable $from, \DateTimeImmutable $to, \DateTimeImmutable $bookedSince): array
+    {
+        return $this->createQueryBuilder('t')
+            ->addSelect('s', 'c', 'p')
+            ->leftJoin('t.splits', 's')
+            ->leftJoin('s.category', 'c')
+            ->leftJoin('c.parent', 'p')
+            ->andWhere('t.account = :account')
+            ->andWhere('t.createdAt >= :from')
+            ->andWhere('t.createdAt <= :to')
+            ->andWhere('t.bookingAt >= :booked_since')
+            ->setParameter('account', $account->getId(), UuidType::NAME)
+            ->setParameter('from', $from)
+            ->setParameter('to', $to)
+            ->setParameter('booked_since', $bookedSince)
+            ->orderBy('t.bookingAt', 'DESC')
+            ->getQuery()
+            ->getResult();
+    }
+
+    /**
      * Sum of the categorized splits per root category, over the period.
      * Sub-categories are counted in their root; splits without category are ignored.
      *

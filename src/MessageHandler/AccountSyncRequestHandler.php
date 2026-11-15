@@ -12,6 +12,7 @@ use App\Enum\AccountSyncError;
 use App\Enum\AccountSyncStatus;
 use App\Enum\Currency;
 use App\Enum\RequisitionStatus;
+use App\Message\AccountAlertsRequest;
 use App\Message\AccountCategorizationRequest;
 use App\Message\AccountSyncRequest;
 use App\Repository\AccountSyncRepository;
@@ -90,6 +91,10 @@ final class AccountSyncRequestHandler
             'account_id' => $accountId,
         ]);
 
+        // For the alerts: the first sync imports months of history (no alert), BALANCE_LOW needs the previous balance
+        $firstSync = null === $account->getSynchronizedAt();
+        $balanceBefore = $account->getBalance();
+
         $sync->start();
         $account->setSynchronizedStatus(AccountSyncStatus::IN_PROGRESS);
         $this->entityManager->flush();
@@ -122,7 +127,8 @@ final class AccountSyncRequestHandler
             $sync = $em->getRepository(AccountSync::class)->find($syncId);
 
             if ($sync !== null) {
-                $sync->fail($this->toError($exception));
+                $error = $this->toError($exception);
+                $sync->fail($error);
                 $failedAccount = $sync->getAccount()->setSynchronizedStatus(AccountSyncStatus::FAILED);
 
                 // GoCardless keeps the requisition "LN" after the agreement expiry: flag it so the client knows it must reconnect
@@ -131,13 +137,21 @@ final class AccountSyncRequestHandler
                 }
 
                 $em->flush();
+
+                // The bank refused the access: CONNECTION_EXPIRED right away, without waiting for the daily task
+                if ($error === AccountSyncError::ACCESS_EXPIRED) {
+                    $this->bus->dispatch(new AccountAlertsRequest($syncId, $balanceBefore));
+                }
             }
 
             return;
         }
 
         // Outside the try: a dispatch failure must not mark the synchronization as failed
-        $this->bus->dispatch(new AccountCategorizationRequest($accountId));
+        if (!$firstSync) {
+            $this->bus->dispatch(new AccountAlertsRequest($syncId, $balanceBefore));
+        }
+        $this->bus->dispatch(new AccountCategorizationRequest($accountId, alerts: !$firstSync));
     }
 
     private function toError(\Throwable $exception): AccountSyncError

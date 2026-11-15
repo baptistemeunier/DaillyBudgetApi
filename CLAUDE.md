@@ -38,4 +38,4 @@ HTTP caching (ETag / 304, per-resource `Cache-Control`) is described in `docs/HT
 
 Automatic categorization (merchant key, categorization rules, split source) is described in `docs/AUTO_CATEGORIZATION.md`. Keep it up to date when that logic changes.
 
-Notifications (inbox, `Notifier` and deduplication key, push subscriptions, settings, Web Push sending, daily scheduled task) are described in `docs/NOTIFICATIONS.md`. Keep it up to date when that logic changes.
+Notifications (inbox, `Notifier` and deduplication key, push subscriptions, settings, Web Push sending, daily scheduled task, periodic sync and the alerts that follow it) are described in `docs/NOTIFICATIONS.md`. Keep it up to date when that logic changes.
