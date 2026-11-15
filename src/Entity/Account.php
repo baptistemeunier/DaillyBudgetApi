@@ -144,9 +144,30 @@ class Account
     #[Groups(['account:read'])]
     private ?\DateTimeImmutable $balanceAt = null;
 
+    /**
+     * BALANCE_LOW is notified when the balance goes below this amount (checking accounts only).
+     * Null: never notified. No global or default value.
+     */
+    #[ORM\Column(type: Types::DECIMAL, precision: 15, scale: 2, nullable: true)]
+    #[Groups(['account:read', 'account:update'])]
+    #[Assert\Regex('/^-?\d{1,13}(\.\d{1,2})?$/', message: 'The amount must be a decimal with at most 2 digits.')]
+    private ?string $lowBalanceThreshold = null;
+
     public function __construct()
     {
         $this->id = Uuid::v7();
+    }
+
+    public function getLowBalanceThreshold(): ?string
+    {
+        return $this->lowBalanceThreshold;
+    }
+
+    public function setLowBalanceThreshold(?string $lowBalanceThreshold): static
+    {
+        $this->lowBalanceThreshold = $lowBalanceThreshold;
+
+        return $this;
     }
 
     /**

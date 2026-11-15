@@ -12,6 +12,9 @@ use App\Entity\AccountConnection;
 use App\Entity\Budget;
 use App\Entity\CategorizationRule;
 use App\Entity\Category;
+use App\Entity\Notification;
+use App\Entity\NotificationSettings;
+use App\Entity\PushSubscription;
 use App\Entity\Transaction;
 use Doctrine\ORM\QueryBuilder;
 use LogicException;
@@ -32,6 +35,9 @@ final readonly class CurrentUserExtension implements QueryCollectionExtensionInt
         Budget::class => false,
         CategorizationRule::class => false,
         Category::class => true,
+        Notification::class => false,
+        NotificationSettings::class => false,
+        PushSubscription::class => false,
         Transaction::class => false,
     ];
 

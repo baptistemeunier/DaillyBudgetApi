@@ -60,7 +60,7 @@ services:
     pull_policy: always
     restart: unless-stopped
     environment: *api-env
-    command: ["php", "bin/console", "messenger:consume", "async", "--time-limit=3600", "--memory-limit=128M"]
+    command: ["php", "bin/console", "messenger:consume", "async", "scheduler_default", "--time-limit=3600", "--memory-limit=128M"]
     healthcheck: { disable: true }
     depends_on:
       migrate: { condition: service_completed_successfully }

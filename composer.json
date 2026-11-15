@@ -13,6 +13,7 @@
         "doctrine/doctrine-bundle": "^3.3",
         "doctrine/doctrine-migrations-bundle": "^4.0",
         "doctrine/orm": "^3.7",
+        "dragonmantank/cron-expression": "^3.6",
         "firebase/php-jwt": "^7.2",
         "phpstan/phpdoc-parser": "^2.4",
         "symfony/cache": "8.1.*",
@@ -24,8 +25,10 @@
         "symfony/framework-bundle": "8.1.*",
         "symfony/http-client": "8.1.*",
         "symfony/intl": "8.1.*",
+        "symfony/lock": "8.1.*",
         "symfony/messenger": "8.1.*",
         "symfony/runtime": "8.1.*",
+        "symfony/scheduler": "8.1.*",
         "symfony/security-bundle": "8.1.*",
         "symfony/twig-bundle": "8.1.*",
         "symfony/yaml": "8.1.*"

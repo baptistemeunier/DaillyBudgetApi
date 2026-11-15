@@ -17,7 +17,8 @@ docker compose up -d database                 # PostgreSQL 16 (only service in c
 symfony serve  # or: php -S localhost:8000 -t public
 bin/console doctrine:migrations:diff          # generate a migration after changing entities
 bin/console doctrine:migrations:migrate
-bin/console messenger:consume async -vv       # run the worker that processes account syncs
+bin/console messenger:consume async scheduler_default -vv  # run the worker: account syncs, notifications and the scheduled tasks
+bin/console app:notifications:daily          # run the daily notification task now (then consume async)
 bin/console debug:router                      # list API routes (API Platform route names: _api_/<path>{._format}_<op>)
 bin/console cache:clear
 ```
@@ -35,3 +36,5 @@ The API logic is described in `docs/DESIGN.md`: authentication, authorization, t
 HTTP caching (ETag / 304, per-resource `Cache-Control`) is described in `docs/HTTP_CACHE.md`. Keep it up to date when that logic changes.
 
 Automatic categorization (merchant key, categorization rules, split source) is described in `docs/AUTO_CATEGORIZATION.md`. Keep it up to date when that logic changes.
+
+Notifications (inbox, `Notifier` and deduplication key, push subscriptions, settings, daily scheduled task) are described in `docs/NOTIFICATIONS.md`. Keep it up to date when that logic changes.

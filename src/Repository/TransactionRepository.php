@@ -40,19 +40,27 @@ class TransactionRepository extends ServiceEntityRepository
 
     /**
      * Transactions of the user not fully categorized: the sum of their splits differs from their amount
-     * (no split at all included).
+     * (no split at all included). Optionally limited to the ones booked in [start, end[.
      */
-    public function countUncategorized(User $owner): int
+    public function countUncategorized(User $owner, ?\DateTimeImmutable $start = null, ?\DateTimeImmutable $end = null): int
     {
-        return (int) $this->createQueryBuilder('t')
+        $qb = $this->createQueryBuilder('t')
             ->select('COUNT(t.id)')
             ->join('t.account', 'a')
             ->andWhere('a.owner = :owner')
             ->andWhere('a.deletedAt IS NULL')
             ->andWhere(self::uncategorizedCondition('t'))
-            ->setParameter('owner', $owner->getId(), UuidType::NAME)
-            ->getQuery()
-            ->getSingleScalarResult();
+            ->setParameter('owner', $owner->getId(), UuidType::NAME);
+
+        if (null !== $start) {
+            $qb->andWhere('t.bookingAt >= :start')->setParameter('start', $start);
+        }
+
+        if (null !== $end) {
+            $qb->andWhere('t.bookingAt < :end')->setParameter('end', $end);
+        }
+
+        return (int) $qb->getQuery()->getSingleScalarResult();
     }
 
     /**

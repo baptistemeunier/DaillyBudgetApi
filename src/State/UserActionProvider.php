@@ -5,13 +5,12 @@ namespace App\State;
 use ApiPlatform\Metadata\Operation;
 use ApiPlatform\State\ProviderInterface;
 use App\ApiResource\UserAction;
-use App\Entity\AccountConnection;
 use App\Entity\User;
-use App\Enum\RequisitionStatus;
 use App\Enum\Role;
 use App\Enum\UserActionType;
 use App\Repository\AccountConnectionRepository;
 use App\Repository\TransactionRepository;
+use App\Service\ConnectionStatusResolver;
 use Symfony\Bundle\SecurityBundle\Security;
 
 /**
@@ -19,13 +18,11 @@ use Symfony\Bundle\SecurityBundle\Security;
  */
 readonly class UserActionProvider implements ProviderInterface
 {
-    // A connection expiring within this delay is reported
-    private const int CONNECTION_EXPIRING_DAYS = 7;
-
     public function __construct(
         private Security $security,
         private AccountConnectionRepository $accountConnectionRepository,
         private TransactionRepository $transactionRepository,
+        private ConnectionStatusResolver $connectionStatusResolver,
     ) {
     }
 
@@ -44,7 +41,7 @@ readonly class UserActionProvider implements ProviderInterface
         if ($this->security->isGranted(Role::ACCOUNT_CONNECTION_READ->value)) {
             $connections = $this->accountConnectionRepository->findBy(['owner' => $user, 'deletedAt' => null]);
             foreach ($connections as $connection) {
-                $type = $this->getConnectionActionType($connection);
+                $type = $this->connectionStatusResolver->resolve($connection);
                 if ($type !== null) {
                     $actions[] = UserAction::forConnection($type, $connection);
                 }
@@ -72,24 +69,5 @@ readonly class UserActionProvider implements ProviderInterface
             ?: ($a->expiresAt?->getTimestamp() ?? PHP_INT_MAX) <=> ($b->expiresAt?->getTimestamp() ?? PHP_INT_MAX));
 
         return $actions;
-    }
-
-    private function getConnectionActionType(AccountConnection $connection): ?UserActionType
-    {
-        $status = $connection->getExternalStatus();
-        $expiresAt = $connection->getAccessExpiresAt();
-        $now = new \DateTimeImmutable();
-
-        return match (true) {
-            $status === null => null,
-            // GoCardless keeps the requisition "LN" after the expiry: the date is enough
-            $status === RequisitionStatus::EXPIRED,
-            $status === RequisitionStatus::SUSPENDED,
-            $status === RequisitionStatus::LINKED && $expiresAt !== null && $expiresAt <= $now => UserActionType::CONNECTION_EXPIRED,
-            $status->needUserAction() => UserActionType::CONNECTION_TO_CONFIGURE,
-            $status === RequisitionStatus::LINKED && $expiresAt !== null
-                && $expiresAt <= $now->modify(sprintf('+%d days', self::CONNECTION_EXPIRING_DAYS)) => UserActionType::CONNECTION_EXPIRING,
-            default => null,
-        };
     }
 }
