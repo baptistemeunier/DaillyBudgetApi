@@ -27,19 +27,20 @@ class TransactionRepository extends ServiceEntityRepository
     }
 
     /**
-     * DQL condition: the sum of the splits differs from the amount (no split at all included).
+     * DQL condition: the transaction is not hidden and the sum of its splits differs from its amount
+     * (no split at all included).
      */
     public static function uncategorizedCondition(string $alias): string
     {
         return sprintf(
-            '%1$s.amount <> (SELECT COALESCE(SUM(uncategorized_split.amount), 0) FROM %2$s uncategorized_split WHERE uncategorized_split.transaction = %1$s)',
+            '%1$s.hidden = false AND %1$s.amount <> (SELECT COALESCE(SUM(uncategorized_split.amount), 0) FROM %2$s uncategorized_split WHERE uncategorized_split.transaction = %1$s)',
             $alias,
             TransactionSplit::class,
         );
     }
 
     /**
-     * Transactions of the user not fully categorized: the sum of their splits differs from their amount
+     * Transactions of the user not hidden and not fully categorized: the sum of their splits differs from their amount
      * (no split at all included). Optionally limited to the ones booked in [start, end[.
      */
     public function countUncategorized(User $owner, ?\DateTimeImmutable $start = null, ?\DateTimeImmutable $end = null): int
@@ -284,6 +285,7 @@ class TransactionRepository extends ServiceEntityRepository
     /**
      * Transactions (alias "t") of the user's active accounts of the given type (checking by default: savings
      * and investment accounts stay out of the budget), in the currency, booked in [start, end[ (no start: since the beginning).
+     * Hidden transactions are left out.
      */
     private function filterPeriod(QueryBuilder $qb, User $owner, Currency $currency, ?\DateTimeImmutable $start, \DateTimeImmutable $end, AccountType $accountType = AccountType::CHECKING): QueryBuilder
     {
@@ -294,6 +296,7 @@ class TransactionRepository extends ServiceEntityRepository
             ->andWhere('period_account.type = :period_account_type')
             ->andWhere('t.currency = :period_currency')
             ->andWhere('t.bookingAt < :period_end')
+            ->andWhere('t.hidden = false')
             ->setParameter('period_owner', $owner->getId(), UuidType::NAME)
             ->setParameter('period_account_type', $accountType)
             ->setParameter('period_currency', $currency)

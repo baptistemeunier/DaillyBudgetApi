@@ -43,4 +43,10 @@ class UpdateTransaction
      * Cannot be combined with splits.
      */
     public bool $confirm = false;
+
+    /**
+     * Hides (true) or shows again (false) the transaction: a hidden transaction stays listed but is left out
+     * of the budget and of the "to categorize" counters. null: unchanged.
+     */
+    public ?bool $hidden = null;
 }

@@ -31,6 +31,7 @@ use Symfony\Component\Validator\Validator\ValidatorInterface;
  * (voter + entity validation), keeps the mirrors of the saving splits (see SavingMirrorLinker) and recomputes
  * the balance of the manual accounts whose mirror transactions changed.
  * With confirm, marks the splits set by a rule as confirmed by the user.
+ * With hidden, hides the transaction from the budget (or shows it again).
  * With rememberCategory, saves the rule "merchant key + direction → category" and applies it to the similar transactions (async).
  */
 final readonly class TransactionProcessor implements ProcessorInterface
@@ -68,6 +69,10 @@ final readonly class TransactionProcessor implements ProcessorInterface
 
         if ($data->confirm) {
             $this->confirmRuleSplits($transaction);
+        }
+
+        if (null !== $data->hidden) {
+            $transaction->setHidden($data->hidden);
         }
 
         // The new splits can only use categories and accounts visible to the user

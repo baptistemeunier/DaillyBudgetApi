@@ -28,6 +28,7 @@ use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Bridge\Doctrine\Validator\Constraints\UniqueEntity;
 use Symfony\Component\Serializer\Attribute\Groups;
+use Symfony\Component\TypeInfo\Type;
 use Symfony\Component\Uid\Uuid;
 use Symfony\Component\Validator\Constraints as Assert;
 
@@ -80,6 +81,11 @@ use Symfony\Component\Validator\Constraints as Assert;
                     filter: new DateFilter(),
                     property: 'bookingAt',
                     description: 'Booking date bounds: bookingAt[after|before|strictly_after|strictly_before]=<date>',
+                ),
+                'hidden' => new QueryParameter(
+                    filter: new ExactFilter(),
+                    property: 'hidden',
+                    description: 'true: only the hidden transactions (left out of the budget), false: only the visible ones',
                 ),
                 // ?accountType[]=checking or ?accountType[]=savings&accountType[]=investment
                 'accountType' => new QueryParameter(
@@ -143,6 +149,14 @@ class Transaction
     #[ORM\Column]
     #[Groups(['transaction:read'])]
     private ?bool $isBooked = null;
+
+    /**
+     * Hidden by the user: kept in the transaction lists and in the account balance, but left out of the
+     * budget (statements, saving statements, budget alerts) and of the "to categorize" counters.
+     */
+    #[ORM\Column(options: ['default' => false])]
+    #[Groups(['transaction:read'])]
+    private bool $hidden = false;
 
     #[ORM\Column(length: 255, nullable: true)]
     private ?string $externalTransactionType = null;
@@ -295,6 +309,18 @@ class Transaction
     public function setIsBooked(bool $isBooked): static
     {
         $this->isBooked = $isBooked;
+
+        return $this;
+    }
+
+    public function isHidden(): bool
+    {
+        return $this->hidden;
+    }
+
+    public function setHidden(bool $hidden): static
+    {
+        $this->hidden = $hidden;
 
         return $this;
     }
