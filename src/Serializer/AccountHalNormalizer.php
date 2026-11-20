@@ -56,6 +56,15 @@ class AccountHalNormalizer implements NormalizerInterface, NormalizerAwareInterf
                     ['id' => $data->getId()],
                 )
             ];
+        } else {
+            // Only a manual account balance can be set by hand
+            $normalized['_links']['balance'] = [
+                'href' => $this->router->generate(
+                    // Custom uriTemplate: the route name has no {._format}
+                    '_api_/accounts/{id}/balance_post',
+                    ['id' => $data->getId()],
+                )
+            ];
         }
 
         return $normalized;

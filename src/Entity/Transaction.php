@@ -103,7 +103,8 @@ use Symfony\Component\Validator\Constraints as Assert;
     ],
     normalizationContext: ['groups' => ['transaction:read', 'timestamp:read']],
 )]
-#[UniqueEntity('externalId')]
+// Same scope as UNIQ_EXTERNAL_ID: two accounts can have transactions with the same provider id
+#[UniqueEntity(fields: ['account', 'externalId'], errorPath: 'externalId')]
 class Transaction
 {
     use UuidTrait;

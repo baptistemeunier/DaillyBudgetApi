@@ -243,16 +243,21 @@ class TransactionRepository extends ServiceEntityRepository
     }
 
     /**
-     * Sum of the transactions of the account (balance of a manual account).
+     * Sum of the transactions of the account (balance of a manual account), up to the given day included when set.
      */
-    public function sumByAccount(Account $account): string
+    public function sumByAccount(Account $account, ?\DateTimeImmutable $until = null): string
     {
-        return (string) ($this->createQueryBuilder('t')
+        $qb = $this->createQueryBuilder('t')
             ->select('COALESCE(SUM(t.amount), 0)')
             ->andWhere('t.account = :account')
-            ->setParameter('account', $account->getId(), UuidType::NAME)
-            ->getQuery()
-            ->getSingleScalarResult());
+            ->setParameter('account', $account->getId(), UuidType::NAME);
+
+        if (null !== $until) {
+            $qb->andWhere('t.bookingAt < :until')
+                ->setParameter('until', $until->setTime(0, 0)->modify('+1 day'));
+        }
+
+        return (string) $qb->getQuery()->getSingleScalarResult();
     }
 
     /**

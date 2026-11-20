@@ -16,7 +16,9 @@ use App\Enum\AccountStatus;
 use App\Enum\AccountSyncStatus;
 use App\Enum\AccountType;
 use App\Dto\CreateManualAccount;
+use App\Dto\UpdateManualBalance;
 use App\Enum\Currency;
+use App\State\AccountBalanceProcessor;
 use App\State\AccountProcessor;
 use App\Validator\ValidAccountType;
 use App\Repository\AccountRepository;
@@ -52,6 +54,14 @@ use Symfony\Component\Validator\Constraints as Assert;
         new Patch(
             denormalizationContext: ['groups' => ['account:update']],
             security: "is_granted('ACCOUNT_EDIT', object)",
+        ),
+        // Manual account only: real balance at a date, the difference is booked as an adjustment transaction
+        new Post(
+            uriTemplate: '/accounts/{id}/balance',
+            status: 200,
+            security: "is_granted('ACCOUNT_EDIT', object)",
+            input: UpdateManualBalance::class,
+            processor: AccountBalanceProcessor::class,
         ),
     ],
     normalizationContext: ['groups' => ['account:read', 'timestamp:read']],
