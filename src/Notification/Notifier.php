@@ -8,8 +8,10 @@ use App\Entity\Category;
 use App\Entity\Notification;
 use App\Entity\Transaction;
 use App\Entity\User;
+use App\Enum\NotificationRecipients;
 use App\Enum\NotificationType;
 use App\Message\SendPushNotification;
+use App\Repository\UserRepository;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\EntityManagerInterface;
@@ -20,6 +22,10 @@ use Symfony\Component\Uid\Uuid;
 
 /**
  * Single entry point to create a notification.
+ *
+ * The recipients depend on the type (NotificationType::recipients()): all the users, or the owner of the subject
+ * only. Each recipient gets their own notification (inbox, read state), pushed on their own devices according to
+ * their own settings.
  *
  * The (owner, dedupKey) pair is unique: a notification already sent is never created again, so a handler or a
  * scheduled task can be replayed without duplicate. Inserted through DBAL so that a duplicate (unique constraint
@@ -32,15 +38,52 @@ final readonly class Notifier
         private EntityManagerInterface $entityManager,
         private LoggerInterface $logger,
         private MessageBusInterface $bus,
+        private UserRepository $userRepository,
     ) {
     }
 
     /**
+     * Notifies the recipients of the type.
+     *
+     * @param User|null $owner owner of the subject; required when the type goes to the owner only
      * @param array<string, mixed> $data parameters of the text (count, expiresAt...)
      *
-     * @return bool true when the notification was created, false when it already existed
+     * @return int number of notifications created (the recipients who already had it are skipped)
      */
     public function notify(
+        ?User $owner,
+        NotificationType $type,
+        Account|AccountConnection|Transaction|Category|null $subject,
+        array $data,
+        string $dedupKey,
+    ): int {
+        $created = 0;
+        foreach ($this->recipients($type, $owner) as $recipient) {
+            $created += (int) $this->notifyRecipient($recipient, $type, $subject, $data, $dedupKey);
+        }
+
+        return $created;
+    }
+
+    /**
+     * @return list<User>
+     */
+    public function recipients(NotificationType $type, ?User $owner): array
+    {
+        return match ($type->recipients()) {
+            NotificationRecipients::ALL => $this->userRepository->findAll(),
+            NotificationRecipients::OWNER => [$owner ?? throw new \LogicException(sprintf('%s goes to the owner of its subject: an owner is required.', $type->value))],
+        };
+    }
+
+    /**
+     * Notifies this user only, whatever the recipients of the type (the caller chose them, e.g. per user threshold).
+     *
+     * @param array<string, mixed> $data parameters of the text (count, expiresAt...)
+     *
+     * @return bool true when the notification was created, false when the user already had it
+     */
+    public function notifyRecipient(
         User $owner,
         NotificationType $type,
         Account|AccountConnection|Transaction|Category|null $subject,
@@ -91,6 +134,7 @@ final readonly class Notifier
 
         $this->logger->info('Notification created.', [
             'notification_id' => $id->toRfc4122(),
+            'owner_id' => $owner->getId()->toRfc4122(),
             'type' => $type->value,
             'dedup_key' => $dedupKey,
         ]);

@@ -55,11 +55,32 @@ enum NotificationType: string
     }
 
     /**
-     * Deduplication key "{TYPE}_{subject uuid}[_{period}]": the period says how often the notification can come back
-     * for this subject; without period, it is sent only once.
+     * Who gets the notification. A connection can only be renewed or configured by its owner (bank consent);
+     * everything else is about data shared between all the users.
      */
-    public function dedupKey(Uuid $subject, ?string $period = null): string
+    public function recipients(): NotificationRecipients
     {
-        return sprintf('%s_%s', $this->value, $subject->toRfc4122()) . (null !== $period ? '_' . $period : '');
+        return match ($this) {
+            self::CONNECTION_EXPIRING,
+            self::CONNECTION_EXPIRED,
+            self::CONNECTION_TO_CONFIGURE => NotificationRecipients::OWNER,
+            self::MONTH_CLOSING,
+            self::BALANCE_LOW,
+            self::LARGE_TRANSACTION,
+            self::INCOME_RECEIVED,
+            self::BUDGET_ALMOST_EXCEEDED,
+            self::BUDGET_EXCEEDED => NotificationRecipients::ALL,
+        };
+    }
+
+    /**
+     * Deduplication key "{TYPE}[_{subject uuid}][_{period}]": the period says how often the notification can come back
+     * for this subject; without period, it is sent only once. No subject: a notification about all the data (MONTH_CLOSING).
+     */
+    public function dedupKey(?Uuid $subject, ?string $period = null): string
+    {
+        return $this->value
+            . (null !== $subject ? '_' . $subject->toRfc4122() : '')
+            . (null !== $period ? '_' . $period : '');
     }
 }

@@ -11,10 +11,12 @@ use Symfony\Component\Security\Core\Authorization\Voter\Voter;
 use Symfony\Component\Security\Core\User\UserInterface;
 
 /**
- * A budget is only visible / editable by its owner.
+ * The budget is shared between all the users (a single one); only its owner (creator) can delete it.
  */
 final class BudgetVoter extends Voter
 {
+    use OwnerCheckTrait;
+
     public const CREATE = 'BUDGET_CREATE';
     public const READ = 'BUDGET_READ';
     public const EDIT = 'BUDGET_EDIT';
@@ -67,17 +69,12 @@ final class BudgetVoter extends Voter
 
     private function voteOnItem(string $attribute, Budget $subject, TokenInterface $token, ?Vote $vote): bool
     {
-        $user = $token->getUser();
-        $owner = $subject->getOwner();
-        // On creation (post-denormalization), the owner is not set yet: it will be the user
-        $isOwner = $owner ? $owner->getId()?->equals($user->getId()) : $attribute === self::CREATE;
-
         if (!$this->hasRole($attribute === self::READ ? Role::BUDGET_READ : Role::BUDGET_WRITE, $vote)) {
             return false;
         }
 
-        if (!$isOwner) {
-            $vote?->addReason('The user does not own this resource.');
+        if ($attribute === self::DELETE && !$this->isOwner($subject, $token->getUser())) {
+            $vote?->addReason('Only the owner of the budget can delete it.');
 
             return false;
         }

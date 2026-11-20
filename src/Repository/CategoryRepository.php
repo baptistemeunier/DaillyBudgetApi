@@ -3,11 +3,9 @@
 namespace App\Repository;
 
 use App\Entity\Category;
-use App\Entity\User;
 use App\Enum\CategoryType;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
-use Symfony\Bridge\Doctrine\Types\UuidType;
 
 /**
  * @extends ServiceEntityRepository<Category>
@@ -20,19 +18,17 @@ class CategoryRepository extends ServiceEntityRepository
     }
 
     /**
-     * Active root categories of a type, visible to the user (system ones and their own).
+     * Active root categories of a type (system ones and the ones of the users: categories are shared).
      *
      * @return list<Category>
      */
-    public function findActiveRoots(CategoryType $type, User $owner): array
+    public function findActiveRoots(CategoryType $type): array
     {
         return $this->createQueryBuilder('c')
             ->andWhere('c.parent IS NULL')
             ->andWhere('c.deletedAt IS NULL')
             ->andWhere('c.type = :type')
-            ->andWhere('(c.owner IS NULL OR IDENTITY(c.owner) = :owner)')
             ->setParameter('type', $type)
-            ->setParameter('owner', $owner->getId(), UuidType::NAME)
             ->orderBy('c.code', 'ASC')
             ->addOrderBy('c.name', 'ASC')
             ->getQuery()
@@ -40,19 +36,17 @@ class CategoryRepository extends ServiceEntityRepository
     }
 
     /**
-     * Saving sub-categories (envelopes) visible to the user, active, by name. The root only groups them.
+     * Saving sub-categories (envelopes), active, by name. The root only groups them.
      *
      * @return Category[]
      */
-    public function findActiveSavingCategories(User $owner): array
+    public function findActiveSavingCategories(): array
     {
         return $this->createQueryBuilder('c')
             ->andWhere('c.deletedAt IS NULL')
             ->andWhere('c.parent IS NOT NULL')
             ->andWhere('c.type = :type')
-            ->andWhere('(c.owner IS NULL OR IDENTITY(c.owner) = :owner)')
             ->setParameter('type', CategoryType::SAVING)
-            ->setParameter('owner', $owner->getId(), UuidType::NAME)
             ->orderBy('c.name', 'ASC')
             ->addOrderBy('c.code', 'ASC')
             ->getQuery()

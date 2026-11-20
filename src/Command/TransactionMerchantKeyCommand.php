@@ -32,7 +32,7 @@ final readonly class TransactionMerchantKeyCommand
 
     public function __invoke(
         SymfonyStyle $io,
-        #[Option(description: 'Categorize the transactions with the rules of their owner')]
+        #[Option(description: 'Categorize the transactions with the rules (shared between the users)')]
         bool $applyRules = false,
     ): int {
         $query = $this->entityManager->createQueryBuilder()
@@ -42,7 +42,7 @@ final readonly class TransactionMerchantKeyCommand
             ->orderBy('t.id')
             ->getQuery();
 
-        $rulesByOwner = [];
+        $rules = null;
         $count = $categorized = $i = 0;
 
         /** @var Transaction $transaction */
@@ -57,8 +57,8 @@ final readonly class TransactionMerchantKeyCommand
                 $io->warning(sprintf('Transaction %s: %s', $transaction->getId(), $exception->getMessage()));
             }
 
-            if ($applyRules && $owner = $transaction->getAccount()->getOwner()) {
-                $rules = $rulesByOwner[$owner->getId()->toRfc4122()] ??= $this->ruleRepository->findByOwner($owner);
+            if ($applyRules) {
+                $rules ??= $this->ruleRepository->findAllWithCategory();
                 $categorized += (int) $this->categorizer->categorize($transaction, $rules);
             }
 
@@ -66,7 +66,7 @@ final readonly class TransactionMerchantKeyCommand
             if (0 === ++$i % self::BATCH_SIZE) {
                 $this->entityManager->flush();
                 $this->entityManager->clear();
-                $rulesByOwner = [];
+                $rules = null;
             }
         }
 

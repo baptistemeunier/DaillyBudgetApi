@@ -25,11 +25,13 @@ final readonly class TransactionNotifier
     }
 
     /**
+     * Notifies this recipient only: the callers loop over Notifier::recipients() (thresholds can differ per user).
+     *
      * @param Transaction[]                            $transactions of the account, same currency
      * @param string                                   $group        period of the grouped notification's key (the sync, the run)
      * @param callable(Transaction): array<string, mixed>|null $extra data added to each separate notification
      */
-    public function notify(User $owner, NotificationType $type, Account $account, array $transactions, string $group, ?callable $extra = null): void
+    public function notify(User $recipient, NotificationType $type, Account $account, array $transactions, string $group, ?callable $extra = null): void
     {
         if (!$transactions) {
             return;
@@ -42,7 +44,7 @@ final readonly class TransactionNotifier
 
         if (count($transactions) <= self::MAX_SEPARATE) {
             foreach ($transactions as $transaction) {
-                $this->notifier->notify($owner, $type, $transaction, $accountData + [
+                $this->notifier->notifyRecipient($recipient, $type, $transaction, $accountData + [
                     'amount' => $transaction->getAmount(),
                     'currency' => $transaction->getCurrency()?->value,
                     'description' => $transaction->getDescription(),
@@ -54,7 +56,7 @@ final readonly class TransactionNotifier
         }
 
         $total = array_sum(array_map(static fn (Transaction $transaction) => Money::toCents((string) $transaction->getAmount()), $transactions));
-        $this->notifier->notify($owner, $type, $account, $accountData + [
+        $this->notifier->notifyRecipient($recipient, $type, $account, $accountData + [
             'count' => count($transactions),
             'total' => Money::fromCents($total),
             'currency' => $transactions[array_key_first($transactions)]->getCurrency()?->value,

@@ -9,7 +9,6 @@ use App\Enum\UserActionType;
 use App\Message\UserNotificationsRequest;
 use App\Notification\Notifier;
 use App\Repository\AccountConnectionRepository;
-use App\Repository\TransactionRepository;
 use App\Repository\UserRepository;
 use App\Service\BankNameResolver;
 use App\Service\ConnectionStatusResolver;
@@ -26,13 +25,9 @@ final readonly class UserNotificationsRequestHandler
     // A connection still waiting for the user's consent after this delay is notified
     private const int TO_CONFIGURE_AFTER_HOURS = 24;
 
-    // MONTH_CLOSING is sent when this many days or fewer are left in the month (a missed day is caught up the next one)
-    private const int MONTH_CLOSING_DAYS = 5;
-
     public function __construct(
         private UserRepository $userRepository,
         private AccountConnectionRepository $accountConnectionRepository,
-        private TransactionRepository $transactionRepository,
         private ConnectionStatusResolver $connectionStatusResolver,
         private BankNameResolver $bankNameResolver,
         private Notifier $notifier,
@@ -53,11 +48,11 @@ final readonly class UserNotificationsRequestHandler
 
         $now = new \DateTimeImmutable('now', new \DateTimeZone('UTC'));
 
+        // Only the owner of a connection can renew or configure it (MONTH_CLOSING is sent once for all the users,
+        // by DailyNotificationsMessageHandler)
         foreach ($this->accountConnectionRepository->findBy(['owner' => $user, 'deletedAt' => null]) as $connection) {
             $this->notifyConnection($user, $connection, $now);
         }
-
-        $this->notifyMonthClosing($user, $now);
     }
 
     private function notifyConnection(User $user, AccountConnection $connection, \DateTimeImmutable $now): void
@@ -102,30 +97,5 @@ final readonly class UserNotificationsRequestHandler
             default:
                 break;
         }
-    }
-
-    /**
-     * Reminder to close the budget of the month, when some of its transactions are still to categorize.
-     */
-    private function notifyMonthClosing(User $user, \DateTimeImmutable $now): void
-    {
-        $daysLeft = (int) $now->format('t') - (int) $now->format('j');
-        if ($daysLeft < 1 || $daysLeft > self::MONTH_CLOSING_DAYS) {
-            return;
-        }
-
-        $start = $now->modify('first day of this month')->setTime(0, 0);
-        $count = $this->transactionRepository->countUncategorized($user, $start, $start->modify('+1 month'));
-        if ($count === 0) {
-            return;
-        }
-
-        $type = NotificationType::MONTH_CLOSING;
-        $month = $now->format('Y-m');
-        $this->notifier->notify($user, $type, null, [
-            'count' => $count,
-            'month' => $month,
-            'daysLeft' => $daysLeft,
-        ], $type->dedupKey($user->getId(), $month));
     }
 }

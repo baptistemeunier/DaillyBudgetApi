@@ -5,7 +5,6 @@ namespace App\Repository;
 use App\Entity\Account;
 use App\Entity\Transaction;
 use App\Entity\TransactionSplit;
-use App\Entity\User;
 use App\Enum\AccountType;
 use App\Enum\CategoryType;
 use App\Enum\Currency;
@@ -40,18 +39,16 @@ class TransactionRepository extends ServiceEntityRepository
     }
 
     /**
-     * Transactions of the user not hidden and not fully categorized: the sum of their splits differs from their amount
+     * Transactions (of all the users: data is shared) not hidden and not fully categorized: the sum of their splits differs from their amount
      * (no split at all included). Optionally limited to the ones booked in [start, end[.
      */
-    public function countUncategorized(User $owner, ?\DateTimeImmutable $start = null, ?\DateTimeImmutable $end = null): int
+    public function countUncategorized(?\DateTimeImmutable $start = null, ?\DateTimeImmutable $end = null): int
     {
         $qb = $this->createQueryBuilder('t')
             ->select('COUNT(t.id)')
             ->join('t.account', 'a')
-            ->andWhere('a.owner = :owner')
             ->andWhere('a.deletedAt IS NULL')
-            ->andWhere(self::uncategorizedCondition('t'))
-            ->setParameter('owner', $owner->getId(), UuidType::NAME);
+            ->andWhere(self::uncategorizedCondition('t'));
 
         if (null !== $start) {
             $qb->andWhere('t.bookingAt >= :start')->setParameter('start', $start);
@@ -65,17 +62,15 @@ class TransactionRepository extends ServiceEntityRepository
     }
 
     /**
-     * Transactions of the user categorized by a rule (at least one split with source "rule"), not yet reviewed.
+     * Transactions categorized by a rule (at least one split with source "rule"), not yet reviewed.
      */
-    public function countAutoCategorized(User $owner): int
+    public function countAutoCategorized(): int
     {
         return (int) $this->createQueryBuilder('t')
             ->select('COUNT(t.id)')
             ->join('t.account', 'a')
-            ->andWhere('a.owner = :owner')
             ->andWhere('a.deletedAt IS NULL')
             ->andWhere(self::autoCategorizedCondition('t', 'auto_source'))
-            ->setParameter('owner', $owner->getId(), UuidType::NAME)
             ->setParameter('auto_source', SplitSource::RULE)
             ->getQuery()
             ->getSingleScalarResult();
@@ -149,7 +144,7 @@ class TransactionRepository extends ServiceEntityRepository
      * @return list<array{root: Uuid, type: CategoryType, amount: string, count: int}> amounts are signed (debits negative),
      *         count = number of transactions (a transaction split across sub-categories of a root counts once)
      */
-    public function sumSplitsByRootCategory(User $owner, Currency $currency, \DateTimeImmutable $start, \DateTimeImmutable $end): array
+    public function sumSplitsByRootCategory(Currency $currency, \DateTimeImmutable $start, \DateTimeImmutable $end): array
     {
         $qb = $this->getEntityManager()->createQueryBuilder()
             ->select('COALESCE(IDENTITY(c.parent), c.id) AS root', 'c.type AS type', 'SUM(s.amount) AS amount', 'COUNT(DISTINCT t.id) AS count')
@@ -159,7 +154,7 @@ class TransactionRepository extends ServiceEntityRepository
             ->groupBy('root')
             ->addGroupBy('c.type');
 
-        $rows = $this->filterPeriod($qb, $owner, $currency, $start, $end)->getQuery()->getScalarResult();
+        $rows = $this->filterPeriod($qb, $currency, $start, $end)->getQuery()->getScalarResult();
 
         return array_map(static fn (array $row) => [
             // Raw value (binary on MySQL) inside COALESCE: not converted by Doctrine
@@ -176,7 +171,7 @@ class TransactionRepository extends ServiceEntityRepository
      *
      * @return list<array{category: Uuid, type: CategoryType, amount: string, count: int}> amounts are signed (debits negative)
      */
-    public function sumSplitsByCategory(User $owner, Currency $currency, ?\DateTimeImmutable $start, \DateTimeImmutable $end, AccountType $accountType = AccountType::CHECKING): array
+    public function sumSplitsByCategory(Currency $currency, ?\DateTimeImmutable $start, \DateTimeImmutable $end, AccountType $accountType = AccountType::CHECKING): array
     {
         $qb = $this->getEntityManager()->createQueryBuilder()
             ->select('IDENTITY(s.category) AS category', 'c.type AS type', 'SUM(s.amount) AS amount', 'COUNT(DISTINCT t.id) AS count')
@@ -186,7 +181,7 @@ class TransactionRepository extends ServiceEntityRepository
             ->groupBy('s.category')
             ->addGroupBy('c.type');
 
-        $rows = $this->filterPeriod($qb, $owner, $currency, $start, $end, $accountType)->getQuery()->getScalarResult();
+        $rows = $this->filterPeriod($qb, $currency, $start, $end, $accountType)->getQuery()->getScalarResult();
 
         return array_map(static fn (array $row) => [
             // Raw value (binary on MySQL): not converted by Doctrine
@@ -202,7 +197,7 @@ class TransactionRepository extends ServiceEntityRepository
      *
      * @return array{debits: int, credits: int}
      */
-    public function countUncategorizedBySign(User $owner, Currency $currency, \DateTimeImmutable $start, \DateTimeImmutable $end): array
+    public function countUncategorizedBySign(Currency $currency, \DateTimeImmutable $start, \DateTimeImmutable $end): array
     {
         $counts = $this->filterPeriod(
             $this->createQueryBuilder('t')
@@ -211,7 +206,7 @@ class TransactionRepository extends ServiceEntityRepository
                     'COALESCE(SUM(CASE WHEN t.amount > 0 THEN 1 ELSE 0 END), 0) AS credits',
                 )
                 ->andWhere(self::uncategorizedCondition('t')),
-            $owner, $currency, $start, $end,
+            $currency, $start, $end,
         )->getQuery()->getSingleResult();
 
         return ['debits' => (int) $counts['debits'], 'credits' => (int) $counts['credits']];
@@ -222,14 +217,14 @@ class TransactionRepository extends ServiceEntityRepository
      *
      * @return array{debits: string, credits: string, categorizedDebits: string, categorizedCredits: string} signed amounts
      */
-    public function sumBySign(User $owner, Currency $currency, \DateTimeImmutable $start, \DateTimeImmutable $end): array
+    public function sumBySign(Currency $currency, \DateTimeImmutable $start, \DateTimeImmutable $end): array
     {
         $totals = $this->filterPeriod(
             $this->createQueryBuilder('t')->select(
                 'COALESCE(SUM(CASE WHEN t.amount < 0 THEN t.amount ELSE 0 END), 0) AS debits',
                 'COALESCE(SUM(CASE WHEN t.amount > 0 THEN t.amount ELSE 0 END), 0) AS credits',
             ),
-            $owner, $currency, $start, $end,
+            $currency, $start, $end,
         )->getQuery()->getSingleResult();
 
         $categorized = $this->filterPeriod(
@@ -241,7 +236,7 @@ class TransactionRepository extends ServiceEntityRepository
                 ->from(TransactionSplit::class, 's')
                 ->join('s.transaction', 't')
                 ->andWhere('s.category IS NOT NULL'),
-            $owner, $currency, $start, $end,
+            $currency, $start, $end,
         )->getQuery()->getSingleResult();
 
         return array_map(static fn ($value) => (string) $value, $totals + $categorized);
@@ -261,12 +256,12 @@ class TransactionRepository extends ServiceEntityRepository
     }
 
     /**
-     * Transactions of the user's savings accounts over the period, with the categorized part of each one
+     * Transactions of the savings accounts over the period, with the categorized part of each one
      * (sum of its splits), for the savings dashboard. Closed accounts are left out.
      *
      * @return list<array{bookingAt: \DateTimeImmutable, amount: string, categorized: string}>
      */
-    public function findSavingsMovements(User $owner, Currency $currency, \DateTimeImmutable $start, \DateTimeImmutable $end): array
+    public function findSavingsMovements(Currency $currency, \DateTimeImmutable $start, \DateTimeImmutable $end): array
     {
         $qb = $this->createQueryBuilder('t')
             ->select('t.bookingAt AS bookingAt', 't.amount AS amount')
@@ -279,25 +274,23 @@ class TransactionRepository extends ServiceEntityRepository
             'bookingAt' => $row['bookingAt'],
             'amount' => (string) $row['amount'],
             'categorized' => (string) $row['categorized'],
-        ], $this->filterPeriod($qb, $owner, $currency, $start, $end, AccountType::SAVINGS)->getQuery()->getResult());
+        ], $this->filterPeriod($qb, $currency, $start, $end, AccountType::SAVINGS)->getQuery()->getResult());
     }
 
     /**
-     * Transactions (alias "t") of the user's active accounts of the given type (checking by default: savings
+     * Transactions (alias "t") of the active accounts (of all the users: data is shared) of the given type (checking by default: savings
      * and investment accounts stay out of the budget), in the currency, booked in [start, end[ (no start: since the beginning).
      * Hidden transactions are left out.
      */
-    private function filterPeriod(QueryBuilder $qb, User $owner, Currency $currency, ?\DateTimeImmutable $start, \DateTimeImmutable $end, AccountType $accountType = AccountType::CHECKING): QueryBuilder
+    private function filterPeriod(QueryBuilder $qb, Currency $currency, ?\DateTimeImmutable $start, \DateTimeImmutable $end, AccountType $accountType = AccountType::CHECKING): QueryBuilder
     {
         $qb
             ->join('t.account', 'period_account')
-            ->andWhere('period_account.owner = :period_owner')
             ->andWhere('period_account.deletedAt IS NULL')
             ->andWhere('period_account.type = :period_account_type')
             ->andWhere('t.currency = :period_currency')
             ->andWhere('t.bookingAt < :period_end')
             ->andWhere('t.hidden = false')
-            ->setParameter('period_owner', $owner->getId(), UuidType::NAME)
             ->setParameter('period_account_type', $accountType)
             ->setParameter('period_currency', $currency)
             ->setParameter('period_end', $end);

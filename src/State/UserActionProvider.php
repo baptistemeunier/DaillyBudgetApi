@@ -39,6 +39,7 @@ readonly class UserActionProvider implements ProviderInterface
         $actions = [];
 
         if ($this->security->isGranted(Role::ACCOUNT_CONNECTION_READ->value)) {
+            // Only the owner of a connection can reconnect or configure it
             $connections = $this->accountConnectionRepository->findBy(['owner' => $user, 'deletedAt' => null]);
             foreach ($connections as $connection) {
                 $type = $this->connectionStatusResolver->resolve($connection);
@@ -49,14 +50,14 @@ readonly class UserActionProvider implements ProviderInterface
         }
 
         if ($this->security->isGranted(Role::ACCOUNT_READ->value)) {
-            $count = $this->transactionRepository->countUncategorized($user);
+            $count = $this->transactionRepository->countUncategorized();
             if ($count > 0) {
                 $action = new UserAction(UserActionType::TRANSACTIONS_TO_CATEGORIZE, UserActionType::TRANSACTIONS_TO_CATEGORIZE->value);
                 $action->count = $count;
                 $actions[] = $action;
             }
 
-            $count = $this->transactionRepository->countAutoCategorized($user);
+            $count = $this->transactionRepository->countAutoCategorized();
             if ($count > 0) {
                 $action = new UserAction(UserActionType::TRANSACTIONS_TO_REVIEW, UserActionType::TRANSACTIONS_TO_REVIEW->value);
                 $action->count = $count;

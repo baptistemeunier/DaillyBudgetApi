@@ -44,7 +44,7 @@ final readonly class SavingStatementProvider implements ProviderInterface
         }
 
         $period = Period::fromString((string) ($uriVariables['period'] ?? ''));
-        $currency = $this->getCurrency($user);
+        $currency = $this->getCurrency();
 
         $statement = new SavingStatement();
         $statement->period = $period->period;
@@ -57,7 +57,7 @@ final readonly class SavingStatementProvider implements ProviderInterface
         $credits = $debits = array_fill_keys($period->monthKeys(), 0);
         $uncategorizedCents = 0;
         $uncategorizedCount = 0;
-        foreach ($this->transactionRepository->findSavingsMovements($user, $currency, $period->start, $period->end) as $movement) {
+        foreach ($this->transactionRepository->findSavingsMovements($currency, $period->start, $period->end) as $movement) {
             $month = $movement['bookingAt']->format('Y-m');
             $cents = Money::toCents($movement['amount']);
             if ($cents > 0) {
@@ -80,7 +80,7 @@ final readonly class SavingStatementProvider implements ProviderInterface
         $statement->debitAmount = Money::fromCents(array_sum($debits));
         $statement->uncategorizedAmount = Money::fromCents($uncategorizedCents);
         $statement->uncategorizedCount = $uncategorizedCount;
-        $statement->envelopes = $this->buildEnvelopes($user, $currency, $period);
+        $statement->envelopes = $this->buildEnvelopes($currency, $period);
 
         return $statement;
     }
@@ -90,13 +90,13 @@ final readonly class SavingStatementProvider implements ProviderInterface
      *
      * @return list<SavingEnvelope>
      */
-    private function buildEnvelopes(User $user, Currency $currency, Period $period): array
+    private function buildEnvelopes(Currency $currency, Period $period): array
     {
-        $total = $this->sumByCategory($user, $currency, null, $period);
-        $periodic = $this->sumByCategory($user, $currency, $period->start, $period);
+        $total = $this->sumByCategory($currency, null, $period);
+        $periodic = $this->sumByCategory($currency, $period->start, $period);
 
         $categories = [];
-        foreach ($this->categoryRepository->findActiveSavingCategories($user) as $category) {
+        foreach ($this->categoryRepository->findActiveSavingCategories() as $category) {
             $categories[$category->getId()->toRfc4122()] = $category;
         }
         foreach (array_keys(array_filter($total)) as $id) {
@@ -124,10 +124,10 @@ final readonly class SavingStatementProvider implements ProviderInterface
      *
      * @return array<string, int> category id => cents
      */
-    private function sumByCategory(User $user, Currency $currency, ?\DateTimeImmutable $start, Period $period): array
+    private function sumByCategory(Currency $currency, ?\DateTimeImmutable $start, Period $period): array
     {
         $sums = [];
-        foreach ($this->transactionRepository->sumSplitsByCategory($user, $currency, $start, $period->end, AccountType::SAVINGS) as $row) {
+        foreach ($this->transactionRepository->sumSplitsByCategory($currency, $start, $period->end, AccountType::SAVINGS) as $row) {
             if (CategoryType::SAVING === $row['type']) {
                 $sums[$row['category']->toRfc4122()] = Money::toCents($row['amount']);
             }
@@ -139,9 +139,9 @@ final readonly class SavingStatementProvider implements ProviderInterface
     /**
      * Budget currency, EUR without budget (same as the statement).
      */
-    private function getCurrency(User $user): Currency
+    private function getCurrency(): Currency
     {
-        $budget = $this->budgetRepository->findOneBy(['owner' => $user]);
+        $budget = $this->budgetRepository->findShared();
 
         return $budget && $this->security->isGranted(BudgetVoter::READ, $budget) ? $budget->getCurrency() : Currency::EUR;
     }

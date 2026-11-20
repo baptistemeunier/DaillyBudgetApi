@@ -136,6 +136,12 @@ readonly class AccountConnectionProcessor implements ProcessorInterface
                 continue;
             }
 
+            // Joint account already synced through the connection of another user: not created twice (its operations
+            // would count twice in the shared budget)
+            if (!$account && $externalAccount['iban'] && $this->accountRepository->findSyncedElsewhereByIban($externalAccount['iban'], $accountConnection)) {
+                continue;
+            }
+
             if(!$account) {
                 $account = new Account()
                     ->setName($externalAccount['name'])

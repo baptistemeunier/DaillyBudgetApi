@@ -3,6 +3,7 @@
 namespace App\Repository;
 
 use App\Entity\Account;
+use App\Entity\AccountConnection;
 use App\Entity\User;
 use App\Enum\AccountStatus;
 use App\Enum\RequisitionStatus;
@@ -51,17 +52,36 @@ class AccountRepository extends ServiceEntityRepository
     }
 
     /**
-     * Active accounts of the user synced with a bank (not manual).
+     * An active account with this IBAN synced through another connection that still has access: the same bank account
+     * connected by another user (joint account). Accounts are shared, so it must not be created twice.
+     */
+    public function findSyncedElsewhereByIban(string $iban, AccountConnection $connection): ?Account
+    {
+        return $this->createQueryBuilder('a')
+            ->join('a.accountConnection', 'c')
+            ->andWhere('a.iban = :iban')
+            ->andWhere('a.deletedAt IS NULL')
+            ->andWhere('(a.externalStatus IS NULL OR a.externalStatus != :expired)')
+            ->andWhere('c != :connection')
+            ->andWhere('c.deletedAt IS NULL')
+            ->setParameter('iban', $iban)
+            ->setParameter('expired', AccountStatus::EXPIRED)
+            ->setParameter('connection', $connection->getId(), UuidType::NAME)
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getOneOrNullResult();
+    }
+
+    /**
+     * Active accounts synced with a bank (not manual), of all the users.
      *
      * @return Account[]
      */
-    public function findSyncedByOwner(User $owner): array
+    public function findSynced(): array
     {
         return $this->createQueryBuilder('a')
-            ->andWhere('a.owner = :owner')
             ->andWhere('a.deletedAt IS NULL')
             ->andWhere('a.externalId IS NOT NULL')
-            ->setParameter('owner', $owner->getId(), UuidType::NAME)
             ->getQuery()
             ->getResult();
     }

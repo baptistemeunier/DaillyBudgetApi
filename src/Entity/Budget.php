@@ -25,10 +25,10 @@ use Symfony\Component\Uid\Uuid;
 use Symfony\Component\Validator\Constraints as Assert;
 
 /**
- * Monthly budget of a user (one per user), split across root expense categories.
+ * Monthly budget, shared between all the users (a single one), split across root expense categories.
+ * The owner is the user who created it, the only one who can delete it.
  */
 #[ORM\Entity(repositoryClass: BudgetRepository::class)]
-#[ORM\UniqueConstraint(name: 'UNIQ_OWNER', columns: ['owner_id'])]
 #[ORM\HasLifecycleCallbacks]
 #[ValidBudgetLines]
 #[ApiResource(
@@ -36,7 +36,7 @@ use Symfony\Component\Validator\Constraints as Assert;
     cacheHeaders: ['max_age' => 0, 'must_revalidate' => true],
     operations: [
         new Get(security: "is_granted('BUDGET_READ', object)"),
-        // The budget of the user, if any (scoped by CurrentUserExtension)
+        // The budget, shared between all the users (at most one)
         new GetCollection(security: "is_granted('BUDGET_READ')"),
         new Post(
             denormalizationContext: ['groups' => ['budget:write', 'budget:create']],

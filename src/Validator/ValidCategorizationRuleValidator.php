@@ -3,10 +3,8 @@
 namespace App\Validator;
 
 use App\Entity\CategorizationRule;
-use App\Entity\User;
 use App\Enum\CategoryType;
 use App\Enum\TransactionDirection;
-use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\Validator\Constraint;
 use Symfony\Component\Validator\ConstraintValidator;
 use Symfony\Component\Validator\Exception\UnexpectedTypeException;
@@ -14,10 +12,6 @@ use Symfony\Component\Validator\Exception\UnexpectedValueException;
 
 final class ValidCategorizationRuleValidator extends ConstraintValidator
 {
-    public function __construct(private readonly Security $security)
-    {
-    }
-
     public function validate(mixed $value, Constraint $constraint): void
     {
         if (!$constraint instanceof ValidCategorizationRule) {
@@ -37,15 +31,7 @@ final class ValidCategorizationRuleValidator extends ConstraintValidator
             return; // reported by NotNull
         }
 
-        // The owner is only set by the processor (after the validation) on a creation
-        $user = $value->getOwner() ?? $this->security->getUser();
-        $categoryOwner = $category->getOwner();
-        if (null !== $categoryOwner && (!$user instanceof User || !$categoryOwner->getId()?->equals($user->getId()))) {
-            $this->addViolation($constraint->visibilityMessage);
-
-            return;
-        }
-
+        // Categories are shared between all the users: any of them can be used
         if (null !== $category->getDeletedAt()) {
             $this->addViolation($constraint->deletedMessage);
 

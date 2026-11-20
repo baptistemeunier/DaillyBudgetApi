@@ -58,11 +58,14 @@ final readonly class CategoryAlerts
             && $transaction->getBookingAt() >= $since
             && null !== $this->incomeCategory($transaction)));
 
-        $this->transactionNotifier->notify($owner, NotificationType::INCOME_RECEIVED, $account, $incomes, $now->format('YmdHis'), function (Transaction $transaction) {
+        $extra = function (Transaction $transaction) {
             $category = $this->incomeCategory($transaction);
 
             return ['categoryCode' => $category?->getCode(), 'categoryName' => $category?->getName()];
-        });
+        };
+        foreach ($this->notifier->recipients(NotificationType::INCOME_RECEIVED, $owner) as $recipient) {
+            $this->transactionNotifier->notify($recipient, NotificationType::INCOME_RECEIVED, $account, $incomes, $now->format('YmdHis'), $extra);
+        }
     }
 
     /**
@@ -72,7 +75,7 @@ final readonly class CategoryAlerts
      */
     private function notifyBudget(User $owner, Account $account, array $transactions, \DateTimeImmutable $now): void
     {
-        $budget = $this->budgetRepository->findOneBy(['owner' => $owner]);
+        $budget = $this->budgetRepository->findShared();
         if (AccountType::CHECKING !== $account->getType() || null === $budget) {
             return;
         }
@@ -100,7 +103,7 @@ final readonly class CategoryAlerts
 
         // Same query as the statement (GET /statements/{period}): expenses are negative
         $spentByRoot = [];
-        foreach ($this->transactionRepository->sumSplitsByRootCategory($owner, $budget->getCurrency(), $start, $end) as $row) {
+        foreach ($this->transactionRepository->sumSplitsByRootCategory($budget->getCurrency(), $start, $end) as $row) {
             $spentByRoot[$row['root']->toRfc4122()] = -Money::toCents($row['amount']);
         }
 

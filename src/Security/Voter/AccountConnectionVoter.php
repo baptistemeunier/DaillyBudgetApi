@@ -10,8 +10,14 @@ use Symfony\Component\Security\Core\Authorization\Voter\Vote;
 use Symfony\Component\Security\Core\Authorization\Voter\Voter;
 use Symfony\Component\Security\Core\User\UserInterface;
 
+/**
+ * Connections are shared between all the users; configuring, synchronizing and deleting one is reserved to its owner
+ * (the user who gave the bank consent).
+ */
 final class AccountConnectionVoter extends Voter
 {
+    use OwnerCheckTrait;
+
     public const CREATE = 'ACCOUNT_CONNECTION_CREATE';
     public const READ = 'ACCOUNT_CONNECTION_READ';
     public const CONFIGURE = 'ACCOUNT_CONNECTION_CONFIGURE';
@@ -89,8 +95,8 @@ final class AccountConnectionVoter extends Voter
             return false;
         }
 
-        if($subject->getOwner()->getId() !== $user->getId()) {
-            $vote?->addReason('The user does not own this resource.');
+        if($attribute !== self::READ && !$this->isOwner($subject, $user)) {
+            $vote?->addReason('Only the owner of the connection can configure, synchronize or delete it.');
 
             return false;
         }

@@ -13,7 +13,7 @@ use Psr\Log\LoggerInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 
 /**
- * Categorizes, with the rules of the owner, the transactions of a synced account that the user has not categorized
+ * Categorizes, with all the rules (shared between the users), the transactions of a synced account that the user has not categorized
  * (no "manual" split). Idempotent: a transaction already categorized by its best rule is left as is.
  */
 #[AsMessageHandler]
@@ -44,7 +44,7 @@ final readonly class AccountCategorizationRequestHandler
         }
 
         // Without rules nothing is categorized, hence no category alert either
-        $rules = $this->ruleRepository->findByOwner($owner);
+        $rules = $this->ruleRepository->findAllWithCategory();
         if (!$rules) {
             return;
         }

@@ -46,13 +46,13 @@ final readonly class StatementProvider implements ProviderInterface
         $period = Period::fromString((string) ($uriVariables['period'] ?? ''));
         [$from, $to, $start, $end, $months] = [$period->from, $period->to, $period->start, $period->end, $period->months];
 
-        $budget = $this->findBudget($user);
+        $budget = $this->findBudget();
         $currency = $budget?->getCurrency() ?? Currency::EUR;
 
         // Signed sums per root category; expenses are negative, shown as positive spending
         $byRoot = [CategoryType::EXPENSE->value => [], CategoryType::INCOME->value => []];
         $counts = []; // root category id => number of transactions
-        foreach ($this->transactionRepository->sumSplitsByRootCategory($user, $currency, $start, $end) as $row) {
+        foreach ($this->transactionRepository->sumSplitsByRootCategory($currency, $start, $end) as $row) {
             if (isset($byRoot[$row['type']->value])) {
                 $id = $row['root']->toRfc4122();
                 $byRoot[$row['type']->value][$id] = Money::toCents($row['amount']);
@@ -90,7 +90,7 @@ final readonly class StatementProvider implements ProviderInterface
         // 2. Every other expense root (target 0), including deleted ones with spending, by decreasing amount
         $unbudgetedCents = array_sum($expenses);
         $budgeted = array_map(static fn (StatementLine $line) => $line->category->getId()->toRfc4122(), $statement->lines);
-        foreach ($this->categoryRepository->findActiveRoots(CategoryType::EXPENSE, $user) as $root) {
+        foreach ($this->categoryRepository->findActiveRoots(CategoryType::EXPENSE) as $root) {
             $id = $root->getId()->toRfc4122();
             if (!in_array($id, $budgeted, true)) {
                 $expenses[$id] ??= 0;
@@ -101,13 +101,13 @@ final readonly class StatementProvider implements ProviderInterface
             $statement->lines[] = $line;
         }
         $statement->unbudgetedAmount = Money::fromCents($unbudgetedCents);
-        $statement->details = $this->buildDetails($user, $currency, $start, $end);
+        $statement->details = $this->buildDetails($currency, $start, $end);
 
-        $totals = $this->transactionRepository->sumBySign($user, $currency, $start, $end);
+        $totals = $this->transactionRepository->sumBySign($currency, $start, $end);
         $uncategorizedCents = -(Money::toCents($totals['debits']) - Money::toCents($totals['categorizedDebits']));
         $uncategorizedIncomeCents = Money::toCents($totals['credits']) - Money::toCents($totals['categorizedCredits']);
 
-        $uncategorizedCounts = $this->transactionRepository->countUncategorizedBySign($user, $currency, $start, $end);
+        $uncategorizedCounts = $this->transactionRepository->countUncategorizedBySign($currency, $start, $end);
 
         $statement->uncategorizedAmount = Money::fromCents($uncategorizedCents);
         $statement->uncategorizedCount = $uncategorizedCounts['debits'];
@@ -126,10 +126,10 @@ final readonly class StatementProvider implements ProviderInterface
      *
      * @return list<StatementDetail>
      */
-    private function buildDetails(User $user, Currency $currency, \DateTimeImmutable $start, \DateTimeImmutable $end): array
+    private function buildDetails(Currency $currency, \DateTimeImmutable $start, \DateTimeImmutable $end): array
     {
         $details = [];
-        foreach ($this->transactionRepository->sumSplitsByCategory($user, $currency, $start, $end) as $row) {
+        foreach ($this->transactionRepository->sumSplitsByCategory($currency, $start, $end) as $row) {
             // Transfers are not part of the statement
             if (!in_array($row['type'], [CategoryType::EXPENSE, CategoryType::INCOME], true)) {
                 continue;
@@ -157,11 +157,11 @@ final readonly class StatementProvider implements ProviderInterface
     }
 
     /**
-     * The user's budget, ignored without the budget read access.
+     * The budget (shared between all the users), ignored without the budget read access.
      */
-    private function findBudget(User $user): ?Budget
+    private function findBudget(): ?Budget
     {
-        $budget = $this->budgetRepository->findOneBy(['owner' => $user]);
+        $budget = $this->budgetRepository->findShared();
 
         return $budget && $this->security->isGranted(BudgetVoter::READ, $budget) ? $budget : null;
     }

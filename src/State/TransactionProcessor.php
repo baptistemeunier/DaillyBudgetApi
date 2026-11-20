@@ -9,6 +9,7 @@ use App\Dto\UpdateTransaction;
 use App\Entity\CategorizationRule;
 use App\Entity\Transaction;
 use App\Entity\TransactionSplit;
+use App\Entity\User;
 use App\Enum\CategoryType;
 use App\Enum\SplitSource;
 use App\Enum\TransactionDirection;
@@ -105,7 +106,7 @@ final readonly class TransactionProcessor implements ProcessorInterface
 
         // Rule flushed: the similar transactions are categorized in the background
         if ($rule) {
-            $this->categorizer->requestOwnerCategorization($rule->getOwner());
+            $this->categorizer->requestCategorization();
         }
 
         return $result;
@@ -170,13 +171,14 @@ final readonly class TransactionProcessor implements ProcessorInterface
             throw new UnprocessableEntityHttpException('This transaction has no merchant to remember (manual account or description without words).');
         }
 
-        $owner = $account->getOwner();
         $direction = TransactionDirection::fromCents($cents);
-        $rule = $this->ruleRepository->findOneSame($owner, $transaction->getMerchantKey(), $direction);
+        $rule = $this->ruleRepository->findOneSame($transaction->getMerchantKey(), $direction);
 
         if (null === $rule) {
+            // Rules are shared: the owner is the user who created it (only they can delete it)
+            $user = $this->security->getUser();
             $rule = new CategorizationRule()
-                ->setOwner($owner)
+                ->setOwner($user instanceof User ? $user : $account->getOwner())
                 ->setPattern($transaction->getMerchantKey())
                 ->setDirection($direction);
             $this->entityManager->persist($rule);

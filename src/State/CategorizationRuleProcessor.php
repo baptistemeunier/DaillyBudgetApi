@@ -43,7 +43,7 @@ final readonly class CategorizationRuleProcessor implements ProcessorInterface
             $data->setOwner($user);
         }
 
-        $same = $this->ruleRepository->findOneSame($data->getOwner(), $data->getPattern(), $data->getDirection());
+        $same = $this->ruleRepository->findOneSame($data->getPattern(), $data->getDirection());
         if (null !== $same && $same !== $data) {
             throw new UnprocessableEntityHttpException('A rule already exists for this pattern and direction: update it instead.');
         }
@@ -51,7 +51,7 @@ final readonly class CategorizationRuleProcessor implements ProcessorInterface
         $result = $this->persistProcessor->process($data, $operation, $uriVariables, $context);
 
         // Rule flushed: the existing transactions are categorized in the background
-        $this->categorizer->requestOwnerCategorization($data->getOwner());
+        $this->categorizer->requestCategorization();
 
         return $result;
     }

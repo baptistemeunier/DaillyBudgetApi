@@ -2,6 +2,7 @@
 namespace App\Serializer;
 
 use App\Entity\AccountConnection;
+use App\Security\Voter\AccountConnectionVoter;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\DependencyInjection\Attribute\AutoconfigureTag;
 use Symfony\Component\Serializer\Normalizer\NormalizerAwareInterface;
@@ -32,10 +33,21 @@ class AccountConnectionHalNormalizer implements NormalizerInterface, NormalizerA
         $context[self::ALREADY_CALLED] = true;
         $normalized = $this->normalizer->normalize($data, $format, $context);
 
-        if($data->getExternalStatus()->needUserAction()) {
+        // Where the user finishes the connection (GoCardless consent page). Only for its owner
+        // (the voter also requires a connection that needs the user)
+        if($this->security->isGranted(AccountConnectionVoter::CONFIGURE, $data)) {
             $normalized['_links']['configure'] = [
                 'href' => $data->getExternalLink()
             ];
+        }
+
+        // Actions reserved to the owner of the connection: the client shows their buttons only when the link is present
+        $self = $this->router->generate('_api_/account_connections/{id}{._format}_get', ['id' => $data->getId()]);
+        if($this->security->isGranted(AccountConnectionVoter::SYNC, $data)) {
+            $normalized['_links']['sync'] = ['href' => $self.'/sync'];
+        }
+        if($this->security->isGranted(AccountConnectionVoter::DELETE, $data)) {
+            $normalized['_links']['delete'] = ['href' => $self];
         }
 
         if($data->getBankId()) {

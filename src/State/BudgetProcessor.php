@@ -40,8 +40,9 @@ final readonly class BudgetProcessor implements ProcessorInterface
                 throw new \LogicException('A user is required to create a budget.');
             }
 
-            if ($this->budgetRepository->count(['owner' => $user]) > 0) {
-                $message = 'The user already has a budget.';
+            // A single budget, shared between all the users
+            if ($this->budgetRepository->count() > 0) {
+                $message = 'A budget already exists: update it instead.';
                 throw new ValidationException(new ConstraintViolationList([
                     new ConstraintViolation($message, $message, [], $data, 'owner', null),
                 ]));

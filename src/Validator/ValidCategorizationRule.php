@@ -11,7 +11,6 @@ use Symfony\Component\Validator\Constraint;
 #[\Attribute(\Attribute::TARGET_CLASS)]
 final class ValidCategorizationRule extends Constraint
 {
-    public string $visibilityMessage = 'This category does not exist.';
     public string $deletedMessage = 'This category is deleted.';
     public string $rootCategoryMessage = 'The category "{{ category }}" is a root category: choose one of its sub-categories.';
     public string $savingMessage = 'A rule cannot use a saving category: categorize these transactions by hand.';

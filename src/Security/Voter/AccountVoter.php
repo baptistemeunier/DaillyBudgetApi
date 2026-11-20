@@ -79,16 +79,9 @@ final class AccountVoter extends Voter
 
     private function voteOnItem(string $attribute, mixed $subject, TokenInterface $token, ?Vote $vote): bool
     {
-        $user = $token->getUser();
-
+        // Accounts are shared between all the users
         if(!$this->security->isGranted(Role::ACCOUNT_READ->value)) {
             $vote?->addReason('The user does not have read access to this resource.');
-
-            return false;
-        }
-
-        if($subject->getOwner()->getId() !== $user->getId()) {
-            $vote?->addReason('The user does not own this resource.');
 
             return false;
         }

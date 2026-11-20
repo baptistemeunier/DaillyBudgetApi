@@ -6,7 +6,6 @@ use App\Entity\CategorizationRule;
 use App\Entity\Transaction;
 use App\Entity\TransactionSplit;
 use App\Enum\SplitSource;
-use App\Entity\User;
 use App\Message\AccountCategorizationRequest;
 use App\Repository\AccountRepository;
 use App\Util\Money;
@@ -27,7 +26,7 @@ final readonly class TransactionCategorizer
     }
 
     /**
-     * @param CategorizationRule[] $rules rules of the owner of the transaction
+     * @param CategorizationRule[] $rules all the rules (shared between the users)
      *
      * @return bool whether the splits of the transaction changed
      */
@@ -89,12 +88,12 @@ final readonly class TransactionCategorizer
     }
 
     /**
-     * Asks for the categorization of all the active synced accounts of the user (async, see
-     * AccountCategorizationRequestHandler), e.g. after a change of their rules. Call it once the rules are flushed.
+     * Asks for the categorization of all the active synced accounts (async, see AccountCategorizationRequestHandler),
+     * e.g. after a change of the rules. Call it once the rules are flushed.
      */
-    public function requestOwnerCategorization(User $owner): void
+    public function requestCategorization(): void
     {
-        foreach ($this->accountRepository->findSyncedByOwner($owner) as $account) {
+        foreach ($this->accountRepository->findSynced() as $account) {
             $this->bus->dispatch(new AccountCategorizationRequest($account->getId()));
         }
     }

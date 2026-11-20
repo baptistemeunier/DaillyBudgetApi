@@ -15,4 +15,12 @@ class BudgetRepository extends ServiceEntityRepository
     {
         parent::__construct($registry, Budget::class);
     }
+
+    /**
+     * The budget, shared between all the users (there is at most one).
+     */
+    public function findShared(): ?Budget
+    {
+        return $this->findOneBy([], ['createdAt' => 'ASC']);
+    }
 }

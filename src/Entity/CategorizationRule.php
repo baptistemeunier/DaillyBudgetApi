@@ -23,13 +23,13 @@ use Symfony\Component\Uid\Uuid;
 use Symfony\Component\Validator\Constraints as Assert;
 
 /**
- * "Always categorize like this": the user's transactions whose merchant key contains the pattern (whole words),
+ * "Always categorize like this": the transactions (of all the users: rules are shared) whose merchant key contains the pattern (whole words),
  * in the direction if given, get a single split on the category (source "rule").
  * Applied to the new transactions of each sync, and to the existing ones when the rule is saved.
  * See docs/AUTO_CATEGORIZATION.md.
  */
 #[ORM\Entity(repositoryClass: CategorizationRuleRepository::class)]
-#[ORM\UniqueConstraint(name: 'UNIQ_RULE', columns: ['owner_id', 'pattern', 'direction'])]
+#[ORM\UniqueConstraint(name: 'UNIQ_RULE', columns: ['pattern', 'direction'])]
 #[ORM\HasLifecycleCallbacks]
 #[ApiResource(
     // Rarely changes: the client keeps it and always revalidates it with If-None-Match (304 when unchanged)
@@ -50,7 +50,7 @@ use Symfony\Component\Validator\Constraints as Assert;
             processor: CategorizationRuleProcessor::class,
         ),
         // The splits already set by the rule are kept (their link to the rule is removed)
-        new Delete(security: "is_granted('CATEGORIZATION_RULE_EDIT', object)"),
+        new Delete(security: "is_granted('CATEGORIZATION_RULE_DELETE', object)"),
     ],
     normalizationContext: ['groups' => ['categorization_rule:read', 'timestamp:read']],
     denormalizationContext: ['groups' => ['categorization_rule:write']],

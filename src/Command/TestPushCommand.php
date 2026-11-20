@@ -4,6 +4,7 @@ namespace App\Command;
 
 use App\Entity\PushSubscription;
 use App\Entity\User;
+use App\Enum\NotificationRecipients;
 use App\Enum\NotificationType;
 use App\Notification\PushMessageFactory;
 use App\Notification\WebPushSender;
@@ -94,6 +95,10 @@ final readonly class TestPushCommand
 
         if (null !== $notificationType) {
             $io->writeln(sprintf('Sample data: <comment>%s</comment>', json_encode($this->sampleData($notificationType), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)));
+            $io->writeln(sprintf('Recipients of a real notification: <comment>%s</comment>', match ($notificationType->recipients()) {
+                NotificationRecipients::ALL => 'all the users',
+                NotificationRecipients::OWNER => 'the owner of the subject only',
+            }));
         }
 
         $rows = [];

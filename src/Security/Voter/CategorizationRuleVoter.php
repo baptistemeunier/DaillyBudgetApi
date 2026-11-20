@@ -11,13 +11,16 @@ use Symfony\Component\Security\Core\Authorization\Voter\Voter;
 use Symfony\Component\Security\Core\User\UserInterface;
 
 /**
- * Categorization rules are only visible / editable by their owner, with the category roles.
+ * Categorization rules are shared between all the users (with the category roles); only their owner can delete them.
  */
 final class CategorizationRuleVoter extends Voter
 {
+    use OwnerCheckTrait;
+
     public const CREATE = 'CATEGORIZATION_RULE_CREATE';
     public const READ = 'CATEGORIZATION_RULE_READ';
     public const EDIT = 'CATEGORIZATION_RULE_EDIT';
+    public const DELETE = 'CATEGORIZATION_RULE_DELETE';
 
     public function __construct(private Security $security)
     {
@@ -31,7 +34,7 @@ final class CategorizationRuleVoter extends Voter
         }
 
         // Object validation
-        return in_array($attribute, [self::CREATE, self::READ, self::EDIT], true)
+        return in_array($attribute, [self::CREATE, self::READ, self::EDIT, self::DELETE], true)
             && $subject instanceof CategorizationRule;
     }
 
@@ -55,14 +58,8 @@ final class CategorizationRuleVoter extends Voter
             return true;
         }
 
-        // Creation, called after denormalization: the owner is set by the processor, so it can only be empty or the user
-        $owner = $subject->getOwner();
-        if (self::CREATE === $attribute && null === $owner) {
-            return true;
-        }
-
-        if (!$owner?->getId()?->equals($user->getId())) {
-            $vote?->addReason('The user does not own this resource.');
+        if (self::DELETE === $attribute && !$this->isOwner($subject, $user)) {
+            $vote?->addReason('Only the owner of the rule can delete it.');
 
             return false;
         }

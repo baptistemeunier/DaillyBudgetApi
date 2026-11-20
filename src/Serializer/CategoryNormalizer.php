@@ -2,6 +2,8 @@
 namespace App\Serializer;
 
 use App\Entity\Category;
+use App\Security\Voter\CategoryVoter;
+use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\DependencyInjection\Attribute\AutoconfigureTag;
 use Symfony\Component\Serializer\Normalizer\NormalizerAwareInterface;
 use Symfony\Component\Serializer\Normalizer\NormalizerAwareTrait;
@@ -15,7 +17,10 @@ class CategoryNormalizer implements NormalizerInterface, NormalizerAwareInterfac
 
     private const string ALREADY_CALLED = 'CATEGORY_ALREADY_CALLED';
 
-    public function __construct(private UrlGeneratorInterface $router)
+    public function __construct(
+        private UrlGeneratorInterface $router,
+        private Security $security,
+    )
     {
 
     }
@@ -36,6 +41,16 @@ class CategoryNormalizer implements NormalizerInterface, NormalizerAwareInterfac
                     ['id' => $data->getParent()->getId()],
                 )
             ];
+        }
+
+        // Shared categories: anyone edits a personal one, only its owner deletes it; system categories are read-only.
+        // The client shows the buttons only when the link is present
+        $self = $this->router->generate('_api_/categories/{id}{._format}_get', ['id' => $data->getId()]);
+        if($this->security->isGranted(CategoryVoter::EDIT, $data)) {
+            $normalized['_links']['edit'] = ['href' => $self];
+        }
+        if($this->security->isGranted(CategoryVoter::DELETE, $data)) {
+            $normalized['_links']['delete'] = ['href' => $self];
         }
 
         return $normalized;

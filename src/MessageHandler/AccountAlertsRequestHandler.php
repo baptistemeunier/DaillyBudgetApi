@@ -74,8 +74,9 @@ final readonly class AccountAlertsRequestHandler
             return;
         }
 
+        // Only the owner of the connection can renew it
         $type = NotificationType::CONNECTION_EXPIRED;
-        $this->notifier->notify($owner, $type, $connection, [
+        $this->notifier->notify($connection->getOwner() ?? $owner, $type, $connection, [
             'bankId' => $connection->getBankId(),
             'bankName' => $this->bankNameResolver->resolve($connection->getBankId()),
             'expiresAt' => $connection->getAccessExpiresAt()?->format(\DateTimeInterface::ATOM),
@@ -116,18 +117,23 @@ final readonly class AccountAlertsRequestHandler
             return;
         }
 
-        $thresholdCents = Money::toCents((string) $this->settingsRepository->findOrDefault($owner)->getLargeTransactionThreshold());
-        $transactions = array_values(array_filter(
-            $this->transactionRepository->findCreatedDuring(
-                $account,
-                $sync->getStartedAt(),
-                // finishedAt is set just before the flush that gives the transactions their createdAt
-                $sync->getFinishedAt()->modify('+1 minute'),
-                new \DateTimeImmutable(sprintf('-%d days', TransactionNotifier::NEW_TRANSACTION_DAYS)),
-            ),
-            static fn (Transaction $transaction) => -Money::toCents((string) $transaction->getAmount()) >= $thresholdCents,
-        ));
+        $transactions = $this->transactionRepository->findCreatedDuring(
+            $account,
+            $sync->getStartedAt(),
+            // finishedAt is set just before the flush that gives the transactions their createdAt
+            $sync->getFinishedAt()->modify('+1 minute'),
+            new \DateTimeImmutable(sprintf('-%d days', TransactionNotifier::NEW_TRANSACTION_DAYS)),
+        );
 
-        $this->transactionNotifier->notify($owner, NotificationType::LARGE_TRANSACTION, $account, $transactions, $sync->getId()->toRfc4122());
+        // Each recipient with their own threshold
+        foreach ($this->notifier->recipients(NotificationType::LARGE_TRANSACTION, $owner) as $recipient) {
+            $thresholdCents = Money::toCents((string) $this->settingsRepository->findOrDefault($recipient)->getLargeTransactionThreshold());
+            $large = array_values(array_filter(
+                $transactions,
+                static fn (Transaction $transaction) => -Money::toCents((string) $transaction->getAmount()) >= $thresholdCents,
+            ));
+
+            $this->transactionNotifier->notify($recipient, NotificationType::LARGE_TRANSACTION, $account, $large, $sync->getId()->toRfc4122());
+        }
     }
 }

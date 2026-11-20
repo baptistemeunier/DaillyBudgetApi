@@ -12,10 +12,12 @@ use Symfony\Component\Security\Core\User\UserInterface;
 
 /**
  * System categories (owner = null) are readable by everyone and never editable.
- * User categories are only visible / editable by their owner.
+ * User categories are shared between all the users: everyone can read and edit them, only their owner can delete them.
  */
 final class CategoryVoter extends Voter
 {
+    use OwnerCheckTrait;
+
     public const CREATE = 'CATEGORY_CREATE';
     public const READ = 'CATEGORY_READ';
     public const EDIT = 'CATEGORY_EDIT';
@@ -74,22 +76,11 @@ final class CategoryVoter extends Voter
     {
         $user = $token->getUser();
         $owner = $subject->getOwner();
-        $isOwner = $owner && $owner->getId()?->equals($user->getId());
+        $isOwner = $this->isOwner($subject, $user);
 
         switch ($attribute) {
             case self::READ:
-                if(!$this->hasRole(Role::CATEGORY_READ, $vote)) {
-                    return false;
-                }
-
-                // System category, or the user's own one
-                if($owner && !$isOwner) {
-                    $vote?->addReason('The user does not own this resource.');
-
-                    return false;
-                }
-
-                return true;
+                return $this->hasRole(Role::CATEGORY_READ, $vote);
             case self::CREATE:
                 // Called after denormalization: owner is set by the processor, so it can only be empty or the user
                 if(!$this->hasRole(Role::CATEGORY_WRITE, $vote)) {
@@ -109,8 +100,14 @@ final class CategoryVoter extends Voter
                     return false;
                 }
 
-                if(!$isOwner) {
-                    $vote?->addReason('Only the owner can modify this category; system categories are read-only.');
+                if(!$owner) {
+                    $vote?->addReason('System categories are read-only.');
+
+                    return false;
+                }
+
+                if($attribute === self::DELETE && !$isOwner) {
+                    $vote?->addReason('Only the owner of the category can delete it.');
 
                     return false;
                 }
