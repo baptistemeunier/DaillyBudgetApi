@@ -26,7 +26,7 @@ bin/console cache:clear
 
 There is no test suite, PHPUnit, linter or static analyser installed yet.
 
-Environment: real values live in `.env.dev.local` (not committed). Required: `DATABASE_URL`, `OAUTH2_CONFIGURATION_URL` (OIDC discovery URL), `OAUTH2_CLIENT_ID`, `GOCARDLESS_BASE_URL` (not declared in `.env`), `GOCARDLESS_CLIENT_ID`, `GOCARDLESS_CLIENT_SECRET`, `MESSENGER_TRANSPORT_DSN` (Doctrine transport, `auto_setup=0`, so the messenger table comes from migrations), `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` (Web Push; only needed to send pushes).
+Environment: real values live in `.env.dev.local` (not committed). Required: `DATABASE_URL`, `OAUTH2_CONFIGURATION_URL` (OIDC discovery URL), `OAUTH2_AUDIENCE` (required `aud` of the JWT access tokens), `GOCARDLESS_BASE_URL` (not declared in `.env`), `GOCARDLESS_CLIENT_ID`, `GOCARDLESS_CLIENT_SECRET`, `MESSENGER_TRANSPORT_DSN` (Doctrine transport, `auto_setup=0`, so the messenger table comes from migrations), `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` (Web Push; only needed to send pushes).
 
 ## Architecture
 

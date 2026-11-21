@@ -35,7 +35,7 @@ bin/console messenger:consume async push scheduler_default -vv   # background wo
 | Variable | Purpose |
 |---|---|
 | `DATABASE_URL` | Database connection |
-| `OAUTH2_CONFIGURATION_URL`, `OAUTH2_CLIENT_ID` | OIDC discovery URL and client id |
+| `OAUTH2_CONFIGURATION_URL`, `OAUTH2_AUDIENCE` | OIDC discovery URL, and the audience the JWT access tokens must carry (`aud`); scopes are read from the `scp` claim (array) |
 | `GOCARDLESS_BASE_URL`, `GOCARDLESS_CLIENT_ID`, `GOCARDLESS_CLIENT_SECRET` | GoCardless Bank Account Data |
 | `MESSENGER_TRANSPORT_DSN` | Messenger transport (Doctrine) |
 | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | Web Push (only needed to send pushes) |

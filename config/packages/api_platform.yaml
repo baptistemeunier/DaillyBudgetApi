@@ -21,27 +21,7 @@ api_platform:
             public: false
             vary: [Content-Type, Authorization, Origin]
 
-    oauth:
-        enabled: true
-        type: oauth2
-        flow: authorizationCode
-
-        clientId: '%env(OAUTH2_CLIENT_ID)%'
-
-        authorizationUrl: 'https://auth.meunier.ovh/oauth/authorize'
-        tokenUrl: 'http://192.168.50.12:8000/oauth/token'
-
-        scopes:
-            #account_connection:read: 'Read Account connections'
-            account_connection:write: 'Write Account connections'
-            #account:read: 'Read Account'
-            account:write: 'Write Account'
-            #category:read: 'Read Category'
-            category:write: 'Write Category'
-            #budget:read: 'Read Budget'
-            budget:write: 'Write Budget'
-
-    # Second way to authenticate in Swagger UI: paste an access token directly ("Authorize" > bearer)
+    # Swagger UI does no login itself (the front owns the whole OAuth flow): paste an access token ("Authorize" > bearer)
     swagger:
         http_auth:
             bearer:

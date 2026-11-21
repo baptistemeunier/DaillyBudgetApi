@@ -3,6 +3,14 @@
 All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Changed
+- Sign-in goes through Authelia (auth.home.meunier.ovh). The API only checks the JWT access tokens: issuer, signature (any key of the JWKS, by kid), audience (`OAUTH2_AUDIENCE`, replaces `OAUTH2_CLIENT_ID`), and scopes from the `scp` claim.
+
+### Removed
+- The `/oauth/token` proxy and the OAuth login of Swagger UI: the front owns the whole OAuth flow. Swagger UI takes a pasted bearer token.
+
 ## [0.1.0] - 2026-11-20
 
 First release.

@@ -33,8 +33,9 @@ readonly class OAuthUserProvider implements UserProviderInterface
             $this->entityManager->flush();
         }
 
+        // Scopes come from the `scp` claim (array) of the Authelia JWT access token
         $roles = ['ROLE_USER'];
-        foreach ($claims['scopes'] as $scope) {
+        foreach ((array) ($claims['scp'] ?? []) as $scope) {
             $roles[] = 'ROLE_' . $scope;
         }
         $user->setRoles($roles);

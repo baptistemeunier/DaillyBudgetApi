@@ -2,7 +2,6 @@
 
 namespace App\Security;
 
-use Firebase\JWT\ExpiredException;
 use Firebase\JWT\JWK;
 use Firebase\JWT\JWT;
 use Firebase\JWT\Key;
@@ -24,14 +23,16 @@ use Throwable;
 class OAuthJwtAuthenticator extends AbstractAuthenticator
 {
     const int CACHE_DURATION = 600;
-    const string CONFIG_CACHE_KEY = 'oauth.configaration';
-    const string JKWS_CACHE_KEY = 'oauth.jkws';
+    // Suffixed with a hash of the URL: changing OAUTH2_CONFIGURATION_URL never reuses the old server's cached config/keys
+    const string CONFIG_CACHE_KEY = 'oauth.configuration.';
+    const string JWKS_CACHE_KEY = 'oauth.jwks.';
 
     public function __construct(
         private readonly HttpClientInterface $client,
         private readonly CacheInterface $cache,
         private readonly OAuthUserProvider $userProvider,
-        #[Autowire(env: 'OAUTH2_CONFIGURATION_URL')] public string $oauthConfigurationUrl
+        #[Autowire(env: 'OAUTH2_CONFIGURATION_URL')] public string $oauthConfigurationUrl,
+        #[Autowire(env: 'OAUTH2_AUDIENCE')] public string $audience,
     )
     {
     }
@@ -49,22 +50,29 @@ class OAuthJwtAuthenticator extends AbstractAuthenticator
 
         $token = $matches[1];
 
-        if(empty($this->oauthConfigurationUrl)) {
-            throw new AuthenticationException("OAuth configuration url is empty");
+        if(empty($this->oauthConfigurationUrl) || empty($this->audience)) {
+            throw new AuthenticationException("OAuth configuration url or audience is empty");
         }
 
         $configuration = $this->getConfiguration();
-        $key = $this->getJkws($configuration);
+        $keys = $this->getJwks($configuration);
 
+        // Only signed JWT access tokens are accepted (the OIDC client must issue them, e.g. Authelia
+        // access_token_signed_response_alg: RS256): an opaque token fails here
         try {
-            $decoded = JWT::decode($token, $key);
-        } catch (ExpiredException $e) {
+            $decoded = JWT::decode($token, $keys);
+        } catch (Throwable $e) {
             throw new AuthenticationException("Invalid token", previous: $e);
         }
 
         # Control issuer
         if(empty($decoded->iss) || $decoded->iss !== $configuration['issuer']) {
             throw new AuthenticationException("Invalid token");
+        }
+
+        # Audience: the token must be issued for this API
+        if (!in_array($this->audience, (array) ($decoded->aud ?? []), true)) {
+            throw new AuthenticationException("Invalid token audience");
         }
 
         // Subject
@@ -119,8 +127,8 @@ class OAuthJwtAuthenticator extends AbstractAuthenticator
     public function getConfiguration(): mixed
     {
         try {
-            return $this->cache->get(self::CONFIG_CACHE_KEY, function (ItemInterface $item): array {
-                    $response = $this->client->request('GET', $this->oauthConfigurationUrl);
+            return $this->cache->get(self::CONFIG_CACHE_KEY . hash('xxh128', $this->oauthConfigurationUrl), function (ItemInterface $item): array {
+                $response = $this->client->request('GET', $this->oauthConfigurationUrl);
 
                 $item->expiresAfter(self::CACHE_DURATION);
 
@@ -131,14 +139,17 @@ class OAuthJwtAuthenticator extends AbstractAuthenticator
         }
     }
 
-    private function getJkws(mixed $configuration): Key
+    /**
+     * @return array<string, Key> the signing keys, by kid
+     */
+    private function getJwks(mixed $configuration): array
     {
         if(empty($configuration["jwks_uri"])) {
             throw new AuthenticationException("JWKS URI is empty");
         }
 
         try {
-            $jwks = $this->cache->get(self::JKWS_CACHE_KEY, function (ItemInterface $item) use ($configuration): array {
+            $jwks = $this->cache->get(self::JWKS_CACHE_KEY . hash('xxh128', $configuration["jwks_uri"]), function (ItemInterface $item) use ($configuration): array {
                 $response = $this->client->request('GET', $configuration["jwks_uri"]);
 
                 $item->expiresAfter(self::CACHE_DURATION);
@@ -150,8 +161,7 @@ class OAuthJwtAuthenticator extends AbstractAuthenticator
         }
 
         try {
-            $keys = JWK::parseKeySet($jwks);
-            return reset($keys);
+            return JWK::parseKeySet($jwks);
         } catch (Throwable $e) {
             throw new AuthenticationException("JWKS is not valid", previous: $e);
         }
